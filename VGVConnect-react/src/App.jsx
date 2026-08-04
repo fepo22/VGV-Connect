@@ -3,7 +3,9 @@ import Layout from "./components/layout/Layout";
 import LoginPage from "./pages/Login/LoginPage";
 import DeliveriesPage from "./pages/Deliveries/DeliveriesPage";
 import Dashboard from "./pages/Dashboard/Dashboard";
-import RoutePlanner from "./pages/RoutePlanner/Routeplanner"; // importa tu página con mayúscula
+import Rutas from "./pages/Rutas/Rutas";
+import RutasChofer from "./pages/Drivers/rutas/RutasChofer";
+import Reportes from "./pages/Reportes/Reportes";
 
 export default function App() {
   return (
@@ -16,7 +18,9 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/entregas" element={<DeliveriesPage />} />
-          <Route path="/routeplanner" element={<RoutePlanner />} /> {/* nueva ruta */}
+          <Route path="/rutas" element={<Rutas />} />
+          <Route path="/rutas/choferes" element={<RutasChofer />} />
+          <Route path="/reportes" element={<Reportes />} />
         </Route>
       </Routes>
     </BrowserRouter>

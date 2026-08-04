@@ -3,19 +3,33 @@ export default function Navbar() {
     <div
       style={{
         width: "100%",
-        height: "60px",
-        background: "#fff",
-        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+        height: "64px",
+        background: "#f8fafc",
+        boxShadow: "0 1px 0 rgba(15, 23, 42, 0.05)",
         display: "flex",
         alignItems: "center",
-        justifyContent: "flex-end",
-        padding: "0 20px",
+        justifyContent: "space-between",
+        padding: "0 24px",
         position: "sticky",
         top: 0,
-        zIndex: 10,
+        zIndex: 20,
       }}
     >
-      <span style={{ fontWeight: "bold" }}>Usuario</span>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <span style={{ fontWeight: 700, color: "#111827" }}>Bienvenido</span>
+      </div>
+      <div
+        style={{
+          background: "#ffffff",
+          padding: "8px 14px",
+          borderRadius: "999px",
+          border: "1px solid rgba(15, 23, 42, 0.08)",
+          color: "#111827",
+          fontWeight: 600,
+        }}
+      >
+        Usuario
+      </div>
     </div>
   );
 }

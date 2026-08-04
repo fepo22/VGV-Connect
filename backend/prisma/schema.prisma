@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Client {
+  id          Int       @id @default(autoincrement())
+  name        String
+  email       String?   @unique
+  phone       String?
+  addresses   Address[]
+  orders      Order[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Address {
+  id          Int      @id @default(autoincrement())
+  client      Client   @relation(fields: [clientId], references: [id])
+  clientId    Int
+  label       String
+  street      String
+  city        String
+  state       String?
+  postalCode  String?
+  country     String   @default("Chile")
+  latitude    Float?
+  longitude   Float?
+  orders      Order[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Driver {
+  id            Int       @id @default(autoincrement())
+  name          String
+  email         String?   @unique
+  phone         String
+  licenseNumber String?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  vehicles      Vehicle[]
+  orders        Order[]
+}
+
+model Vehicle {
+  id           Int       @id @default(autoincrement())
+  licensePlate String    @unique
+  model        String?
+  capacity     Int       @default(1)
+  driver       Driver?   @relation(fields: [driverId], references: [id])
+  driverId     Int?
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  orders       Order[]
+}
+
+model Order {
+  id            Int       @id @default(autoincrement())
+  reference     String    @unique
+  client        Client   @relation(fields: [clientId], references: [id])
+  clientId      Int
+  address       Address  @relation(fields: [addressId], references: [id])
+  addressId     Int
+  vehicle       Vehicle? @relation(fields: [vehicleId], references: [id])
+  vehicleId     Int?
+  driver        Driver?  @relation(fields: [driverId], references: [id])
+  driverId      Int?
+  status        String    @default("pending")
+  scheduledAt   DateTime?
+  deliveredAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}

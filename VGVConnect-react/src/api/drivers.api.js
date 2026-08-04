@@ -1,11 +1,6 @@
-const API_URL = "http://localhost:4000/deliveries";
+import http from "./http";
 
-export const registrarEntregaDriver = async (data) => {
-  const res = await fetch(API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-
-  return await res.json();
+export const getDrivers = async () => {
+  const response = await http.get("/drivers");
+  return response.data;
 };
