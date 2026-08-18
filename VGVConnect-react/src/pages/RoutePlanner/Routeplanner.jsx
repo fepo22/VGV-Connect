@@ -1,24 +1,75 @@
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import RouteList from "../../components/deliveries/RouteList";
 import MapView from "../../components/maps/Mapview";
-import { createRoute, getRoutes, optimizeRoute, updateRoute } from "../../api/routes.api";
+import { createRoute, deleteRoute, getRoutes, optimizeRoute, updateRoute } from "../../api/routes.api";
 
 const initialForm = {
-  name: "",
   date: new Date().toISOString().slice(0, 10),
+  deliveryDate: "",
+  startTime: "08:00",
+  origin: "",
+  destination: "",
   driverId: "",
-  stopIds: [],
+  vehicleId: "",
+  weightKg: "",
+  volumeM3: "",
+  stops: [],
 };
+
+const normalizeFormStops = (stops = []) =>
+  (Array.isArray(stops) ? stops : []).map((stop) => ({
+    id: stop.id ?? null,
+    client: stop.client || stop.clientName || "Punto de descarga",
+    address: stop.address || stop.direccion || "",
+    guideNumber: stop.guideNumber || "",
+    status: stop.status || "pending",
+  }));
+
+const routeStatusOptions = [
+  { value: "draft", label: "Borrador" },
+  { value: "planned", label: "Planificado" },
+  { value: "in_progress", label: "En progreso" },
+  { value: "completed", label: "Completado" },
+];
+
+const deliveryStatusOptions = [
+  { value: "pending", label: "Pendiente" },
+  { value: "planned", label: "Planificado" },
+  { value: "in_progress", label: "En progreso" },
+  { value: "completed", label: "Completado" },
+  { value: "rejected", label: "Rechazado" },
+  { value: "not_found", label: "No encontrado" },
+];
+
+const formatRouteStatusLabel = (status) => ({
+  draft: "Borrador",
+  planned: "Planificado",
+  in_progress: "En progreso",
+  completed: "Completado",
+  pending: "Pendiente",
+})[status] || status;
 
 export default function Routeplanner() {
   const [routes, setRoutes] = useState([]);
   const [drivers, setDrivers] = useState([]);
-  const [availableStops, setAvailableStops] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const [selectedRoute, setSelectedRoute] = useState(null);
+  const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [routeSearch, setRouteSearch] = useState("");
+  const [routeDateFilter, setRouteDateFilter] = useState("");
+  const [expandedSections, setExpandedSections] = useState({ routes: true, form: true, stops: true });
+  const deferredRouteSearch = useDeferredValue(routeSearch.trim().toLowerCase());
+
+  const toggleSection = (section) => {
+    setExpandedSections((current) => ({
+      ...current,
+      [section]: !current[section],
+    }));
+  };
 
   const loadRoutes = async () => {
     setLoading(true);
@@ -26,7 +77,7 @@ export default function Routeplanner() {
       const { data } = await getRoutes();
       setRoutes(data.routes);
       setDrivers(data.drivers);
-      setAvailableStops(data.availableStops);
+      setVehicles(data.vehicles);
       setSelectedRoute((current) => data.routes.find((route) => route.id === current?.id) || data.routes[0] || null);
     } catch {
       setError("No se pudieron cargar las rutas.");
@@ -42,22 +93,166 @@ export default function Routeplanner() {
   }, []);
 
   const coordinates = selectedRoute?.coordinates || [];
+  const filteredRoutes = useMemo(() => routes.filter((route) => {
+    const searchable = [route.documentNumber, route.driverName, route.destination, ...(route.stops || []).map((stop) => stop.guideNumber)].filter(Boolean).join(" ").toLowerCase();
+    const matchesDate = !routeDateFilter || route.date === routeDateFilter || route.deliveryDate === routeDateFilter;
+    return matchesDate && (!deferredRouteSearch || searchable.includes(deferredRouteSearch));
+  }), [routes, routeDateFilter, deferredRouteSearch]);
   const selectedStops = useMemo(() => selectedRoute?.stops || [], [selectedRoute]);
+  const groupedStops = useMemo(() => {
+    const groups = new Map();
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+    selectedStops.forEach((stop) => {
+      const key = `${stop.client || "Punto de descarga"}::${stop.address || "Sin dirección"}`;
+      const current = groups.get(key) || {
+        id: key,
+        client: stop.client || "Punto de descarga",
+        address: stop.address || "Sin dirección",
+        documents: [],
+        status: stop.status || selectedRoute?.status || "pending",
+      };
+
+      if (stop.guideNumber) {
+        current.documents.push(stop.guideNumber);
+      }
+
+      groups.set(key, current);
+    });
+
+    return Array.from(groups.values()).map((group, index) => ({
+      ...group,
+      sequence: index + 1,
+      documents: [...new Set(group.documents)],
+    }));
+  }, [selectedRoute, selectedStops]);
+
+  const selectRoute = (route) => {
+    setSelectedRoute(route);
+    setEditingId(route.id);
+    setForm({
+      date: route.date || initialForm.date,
+      startTime: route.startTime || initialForm.startTime,
+      origin: route.origin || "",
+      destination: route.destination || "",
+      driverId: route.driverId ? String(route.driverId) : "",
+      vehicleId: route.vehicleId ? String(route.vehicleId) : "",
+      weightKg: route.weightKg || "",
+      volumeM3: route.volumeM3 || "",
+      deliveryDate: route.deliveryDate || "",
+      stops: normalizeFormStops(route.stops || []),
+    });
+  };
+
+  const handleAddStop = () => {
+    setForm((current) => ({
+      ...current,
+      stops: [...(current.stops || []), { id: null, client: "Punto de descarga", address: "", guideNumber: "", status: "pending" }],
+    }));
+  };
+
+  const handleUpdateStop = (index, field, value) => {
+    setForm((current) => ({
+      ...current,
+      stops: (current.stops || []).map((stop, stopIndex) => (stopIndex === index ? { ...stop, [field]: value } : stop)),
+    }));
+  };
+
+  const handleRemoveStop = (index) => {
+    setForm((current) => ({
+      ...current,
+      stops: (current.stops || []).filter((_, stopIndex) => stopIndex !== index),
+    }));
+  };
+
+  const submitRoute = async (event) => {
+    if (event) event.preventDefault();
+    if (editingId && selectedRoute && hasRouteChanges(selectedRoute, form)) {
+      const confirmed = window.confirm("Hay cambios en la ruta. ¿Deseas guardar los puntos de descarga y los datos modificados?");
+      if (!confirmed) {
+        return;
+      }
+    }
     setSaving(true);
     setError("");
     try {
-      await createRoute({
+      const nextPayload = {
         ...form,
         driverId: form.driverId || null,
-        stopIds: form.stopIds.length ? form.stopIds : undefined,
-      });
+        vehicleId: form.vehicleId || null,
+        startTime: form.startTime,
+        stops: (form.stops || []).map((stop) => ({
+          id: stop.id ?? null,
+          client: (stop.client || "Punto de descarga").trim(),
+          address: (stop.address || "").trim(),
+          guideNumber: (stop.guideNumber || "").trim(),
+          status: stop.status || "pending",
+        })),
+      };
+      if (editingId) await updateRoute(editingId, nextPayload);
+      else await createRoute(nextPayload);
+      setForm(initialForm);
+      setEditingId(null);
+      await loadRoutes();
+    } catch {
+      setError(editingId ? "No se pudieron guardar los cambios de la ruta." : "No se pudo crear la ruta.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const buildRouteFormState = (route) => ({
+    date: route?.date || initialForm.date,
+    startTime: route?.startTime || initialForm.startTime,
+    origin: route?.origin || "",
+    destination: route?.destination || "",
+    driverId: route?.driverId ? String(route.driverId) : "",
+    vehicleId: route?.vehicleId ? String(route.vehicleId) : "",
+    weightKg: route?.weightKg || "",
+    volumeM3: route?.volumeM3 || "",
+    deliveryDate: route?.deliveryDate || "",
+    stops: normalizeFormStops(route?.stops || []),
+  });
+
+  const hasRouteChanges = (route, currentForm) => {
+    if (!route) return false;
+    const nextForm = buildRouteFormState(route);
+    return JSON.stringify({
+      ...nextForm,
+      stops: (currentForm.stops || []).map((stop) => ({
+        id: stop.id ?? null,
+        client: (stop.client || "Punto de descarga").trim(),
+        address: (stop.address || "").trim(),
+        guideNumber: (stop.guideNumber || "").trim(),
+        status: stop.status || "pending",
+      })),
+    }) !== JSON.stringify({
+      ...nextForm,
+      stops: (nextForm.stops || []).map((stop) => ({
+        id: stop.id ?? null,
+        client: (stop.client || "Punto de descarga").trim(),
+        address: (stop.address || "").trim(),
+        guideNumber: (stop.guideNumber || "").trim(),
+        status: stop.status || "pending",
+      })),
+    });
+  };
+
+  const handleSubmit = async (event) => {
+    await submitRoute(event);
+  };
+
+  const handleDelete = async () => {
+    if (!selectedRoute || !window.confirm("¿Eliminar esta ruta y sus asignaciones?")) return;
+    setSaving(true);
+    setError("");
+    try {
+      await deleteRoute(selectedRoute.id);
+      setSelectedRoute(null);
+      setEditingId(null);
       setForm(initialForm);
       await loadRoutes();
     } catch {
-      setError("No se pudo crear la ruta.");
+      setError("No se pudo eliminar la ruta.");
     } finally {
       setSaving(false);
     }
@@ -90,7 +285,7 @@ export default function Routeplanner() {
         <div>
           <p className="eyebrow">Administración operativa</p>
           <h2>Planificador de rutas</h2>
-          <p>Crea recorridos, asigna choferes y ordena las paradas antes de enviarlas a operación.</p>
+          <p>Crea recorridos, asigna choferes y organiza las cargas del camión antes de enviarlas a operación.</p>
         </div>
         <button className="primary-action" onClick={handleOptimize} disabled={!selectedRoute || saving} type="button">
           Optimizar ruta
@@ -99,30 +294,120 @@ export default function Routeplanner() {
 
       {error && <p className="route-error" role="alert">{error}</p>}
 
+      <div className="route-filter-bar">
+        <label className="route-filter-search">Buscar ruta, chofer o guía<input value={routeSearch} onChange={(event) => setRouteSearch(event.target.value)} placeholder="Ej. Ruta 18-08, Camila o GD-0001" /></label>
+        <label>Fecha de ruta<input type="date" value={routeDateFilter} onClick={(event) => event.currentTarget.showPicker?.()} onChange={(event) => setRouteDateFilter(event.target.value)} /></label>
+        {(routeSearch || routeDateFilter) && <button className="secondary-action small" onClick={() => { setRouteSearch(""); setRouteDateFilter(""); }} type="button">Limpiar</button>}
+      </div>
+
       <div className="route-planner-grid">
         <aside className="route-planner-sidebar">
-          <div className="panel-heading"><div><p className="eyebrow">Planificación</p><h3>Rutas creadas</h3></div><span>{routes.length}</span></div>
-          {loading ? <p>Cargando rutas...</p> : <RouteList routes={routes} selectedId={selectedRoute?.id} onSelect={setSelectedRoute} />}
+          <button type="button" className="panel-heading accordion-trigger" aria-expanded={expandedSections.routes} onClick={() => toggleSection("routes")}>
+            <div>
+              <p className="eyebrow">Planificación</p>
+              <h3>Rutas creadas</h3>
+            </div>
+            <span className="accordion-badge">{routes.length}</span>
+            <span className="accordion-icon">{expandedSections.routes ? "−" : "+"}</span>
+          </button>
+          {expandedSections.routes && (loading ? <p>Cargando rutas...</p> : <RouteList routes={filteredRoutes} selectedId={selectedRoute?.id} onSelect={selectRoute} />)}
         </aside>
 
         <div className="route-planner-workspace">
           <form className="route-form" onSubmit={handleSubmit}>
-            <div className="panel-heading"><div><p className="eyebrow">Nueva ruta</p><h3>Configurar recorrido</h3></div></div>
-            <label>Nombre de la ruta<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Ej. Zona norte - tarde" /></label>
-            <div className="route-form-fields">
-              <label>Fecha<input required type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></label>
-              <label>Chofer<select value={form.driverId} onChange={(event) => setForm({ ...form, driverId: event.target.value })}><option value="">Sin asignar</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label>
-            </div>
-            <fieldset className="route-stops-picker"><legend>Paradas incluidas</legend>{availableStops.map((stop) => <label key={stop.id}><input checked={form.stopIds.includes(stop.id)} onChange={(event) => setForm({ ...form, stopIds: event.target.checked ? [...form.stopIds, stop.id] : form.stopIds.filter((id) => id !== stop.id) })} type="checkbox" />{stop.client} · {stop.address}</label>)}</fieldset>
-            <button className="secondary-action" disabled={saving} type="submit">{saving ? "Guardando..." : "Crear ruta"}</button>
+            <button type="button" className="panel-heading accordion-trigger" aria-expanded={expandedSections.form} onClick={() => toggleSection("form")}>
+              <div>
+                <p className="eyebrow">{editingId ? "Editar ruta" : "Nueva ruta"}</p>
+                <h3>Configurar recorrido</h3>
+              </div>
+              <span className="accordion-icon">{expandedSections.form ? "−" : "+"}</span>
+            </button>
+            {expandedSections.form && (
+              <>
+                <div className="route-form-fields">
+                  <label>Fecha de planificación<input required type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></label>
+                  <label>Fecha de entrega<input type="date" value={form.deliveryDate} onChange={(event) => setForm({ ...form, deliveryDate: event.target.value })} /></label>
+                  <label>Chofer<select required value={form.driverId} onChange={(event) => setForm({ ...form, driverId: event.target.value })}><option value="">Seleccionar chofer</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label>
+                  <label>Camión / patente<select required value={form.vehicleId} onChange={(event) => setForm({ ...form, vehicleId: event.target.value })}><option value="">Seleccionar patente</option>{vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.licensePlate} · {vehicle.name}</option>)}</select></label>
+                </div>
+                <div className="route-form-fields"><label>Origen<input required value={form.origin} onChange={(event) => setForm({ ...form, origin: event.target.value })} placeholder="Ej. Av. Presidente Kennedy 9000, Santiago" /><small className="route-field-help">Dirección de origen para la ruta.</small></label><label>Destino<input required value={form.destination} onChange={(event) => setForm({ ...form, destination: event.target.value })} placeholder="Ej. Av. Apoquindo 3000, Las Condes" /><small className="route-field-help">Destino de la ruta y optimización del recorrido.</small></label></div>
+                <div className="route-form-fields"><label>Peso de carga (kg)<input min="0" step="0.01" type="number" value={form.weightKg} onChange={(event) => setForm({ ...form, weightKg: event.target.value })} placeholder="Ej. 2400" /></label><label>Volumen de carga (m3)<input min="0" step="0.001" type="number" value={form.volumeM3} onChange={(event) => setForm({ ...form, volumeM3: event.target.value })} placeholder="Ej. 18" /></label></div>
+                <label>Hora de inicio<input required type="time" value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} /></label>
+
+                <div className="route-stop-editor">
+                  <button type="button" className="panel-heading accordion-trigger" aria-expanded={expandedSections.stops} onClick={() => toggleSection("stops")}>
+                    <div>
+                      <p className="eyebrow">Puntos de descarga</p>
+                      <h3>Editar puntos</h3>
+                    </div>
+                    <span className="accordion-badge">{form.stops.length}</span>
+                    <span className="accordion-icon">{expandedSections.stops ? "−" : "+"}</span>
+                  </button>
+
+                  {expandedSections.stops && (
+                    <>
+                      <div className="route-stop-editor-header">
+                        <h4>Puntos de descarga</h4>
+                        <button className="secondary-action small" onClick={handleAddStop} type="button">Agregar punto</button>
+                      </div>
+
+                      {form.stops.length === 0 ? (
+                        <p className="route-field-help">Sin puntos agregados aún. Puedes agregar uno desde aquí.</p>
+                      ) : (
+                        <div className="route-stop-editor-list">
+                          {form.stops.map((stop, index) => (
+                            <div className="route-stop-editor-item" key={`${stop.id ?? "new"}-${index}`}>
+                              <div className="route-form-fields compact">
+                                <label>Cliente<input value={stop.client} onChange={(event) => handleUpdateStop(index, "client", event.target.value)} placeholder="Nombre del punto" /></label>
+                                <label>Guía / documento<input value={stop.guideNumber} onChange={(event) => handleUpdateStop(index, "guideNumber", event.target.value)} placeholder="GD-0001" /></label>
+                              </div>
+                              <label>Dirección<input value={stop.address} onChange={(event) => handleUpdateStop(index, "address", event.target.value)} placeholder="Dirección completa" /></label>
+                              <div className="route-stop-editor-actions">
+                                <select value={stop.status || "pending"} onChange={(event) => handleUpdateStop(index, "status", event.target.value)}>
+                                  {deliveryStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                </select>
+                                <button className="danger-action small" onClick={() => handleRemoveStop(index)} type="button">Quitar</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <small className="route-field-help">Estos valores quedan abiertos en el flujo de planificación y se usan para la programación del chofer sin bloquear la operación por ahora.</small>
+                <div className="route-detail-actions">
+                  <button className="primary-action" disabled={saving} type="submit">{saving ? "Guardando..." : editingId ? "Guardar cambios" : "Crear ruta"}</button>
+                </div>
+              </>
+            )}
           </form>
 
           <div className="route-detail-panel">
             {selectedRoute ? <>
-              <div className="panel-heading"><div><p className="eyebrow">Ruta seleccionada</p><h3>{selectedRoute.name}</h3><small>{selectedRoute.driverName} · {selectedRoute.date}</small></div><select value={selectedRoute.status} onChange={(event) => handleStatus(event.target.value)}><option value="draft">Borrador</option><option value="planned">Planificada</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></div>
+              <div className="panel-heading"><div><p className="eyebrow">Ruta seleccionada</p><h3>{selectedRoute.documentNumber || `Ruta #${selectedRoute.id}`}</h3><small>{selectedRoute.vehicleName} · {selectedRoute.driverName} · {selectedRoute.date} {selectedRoute.startTime}</small><small>{selectedRoute.origin} → {selectedRoute.destination}</small></div><div className="route-detail-actions"><select value={selectedRoute.status} onChange={(event) => handleStatus(event.target.value)}>{routeStatusOptions.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select><button className="danger-action" onClick={handleDelete} type="button">Eliminar</button></div></div>
               <MapView coordinates={coordinates} />
-              <div className="route-stops"><h4>Paradas del recorrido</h4>{selectedStops.map((stop) => <div className="route-stop" key={stop.id}><b>{String(stop.sequence).padStart(2, "0")}</b><span><strong>{stop.client}</strong><small>{stop.address}</small></span><em>{stop.status}</em></div>)}</div>
-            </> : <p>Selecciona una ruta para revisar sus paradas.</p>}
+              <div className="route-stops">
+                <h4>Puntos de descarga</h4>
+                {groupedStops.map((stop, index) => {
+                  const stopStatus = stop.status || selectedRoute.status || "pending";
+                  const badgeText = stop.documents.length > 0 ? stop.documents.join(", ") : "Sin guía asociada";
+
+                  return (
+                    <div className="route-stop" key={stop.id ?? `${selectedRoute.id}-${index}`}>
+                      <b>{String(index + 1).padStart(2, "0")}</b>
+                      <span>
+                        <strong>{stop.client}</strong>
+                        <small>{stop.address}</small>
+                        <small className="route-stop-documents">Guías: {badgeText}</small>
+                      </span>
+                      <em>{formatRouteStatusLabel(stopStatus)}</em>
+                    </div>
+                  );
+                })}
+              </div>
+            </> : <p>Selecciona una ruta para revisar sus cargas asignadas.</p>}
           </div>
         </div>
       </div>

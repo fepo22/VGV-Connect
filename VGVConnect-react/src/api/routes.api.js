@@ -7,4 +7,6 @@ export const createRoute = (payload) => http.post("/routes", payload);
 
 export const updateRoute = (id, payload) => http.put(`/routes/${id}`, payload);
 
+export const deleteRoute = (id) => http.delete(`/routes/${id}`);
+
 export const optimizeRoute = (id) => http.post(`/routes/${id}/optimize`);

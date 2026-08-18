@@ -1,42 +1,24 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  getDeliveries,
-  updateDeliveryStatus,
-  uploadDeliveryPhoto,
-  createDeliveryReport,
-} from "../api/deliveries.api";
+import { getDeliveries } from "../api/deliveries.api";
 
 export function useDeliveries() {
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const loadDeliveries = useCallback(async () => {
     setLoading(true);
-    const { data } = await getDeliveries();
-    setDeliveries(data);
-    setLoading(false);
+    setError("");
+    try {
+      const { data } = await getDeliveries();
+      setDeliveries(data);
+    } catch {
+      setDeliveries([]);
+      setError("No se pudieron cargar las entregas.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
-
-  const uploadPhoto = async (file) => {
-    const formData = new FormData();
-    formData.append("photo", file);
-
-    const { data } = await uploadDeliveryPhoto(formData);
-    return data.url;
-  };
-
-  const markAsDelivered = async (id, photoUrl, location) => {
-    await updateDeliveryStatus(id, "delivered");
-
-    await createDeliveryReport({
-      deliveryId: id,
-      photoUrl,
-      location,
-      timestamp: new Date().toISOString(),
-    });
-
-    loadDeliveries();
-  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -49,7 +31,6 @@ export function useDeliveries() {
   return {
     deliveries,
     loading,
-    uploadPhoto,
-    markAsDelivered,
+    error,
   };
 }

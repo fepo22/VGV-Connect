@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getDeliveries } from "../../api/deliveries.api";
+import { normalizeDeliveryStatus } from "../../utils/deliveryStatus";
 
-const readStatus = (delivery) => delivery.status || delivery.estado;
+const readStatus = (delivery) => normalizeDeliveryStatus(delivery.status || delivery.estado);
 
 export default function Dashboard() {
   const [deliveries, setDeliveries] = useState([]);
@@ -15,12 +16,15 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  const summary = useMemo(() => ({
-    total: deliveries.length,
-    delivered: deliveries.filter((item) => readStatus(item) === "delivered").length,
-    inRoute: deliveries.filter((item) => readStatus(item) === "in_route").length,
-    pending: deliveries.filter((item) => readStatus(item) === "pending").length,
-  }), [deliveries]);
+  const summary = useMemo(() => {
+    const operationalDeliveries = deliveries.filter((item) => item.routeId != null);
+    return {
+      total: operationalDeliveries.length,
+      completed: operationalDeliveries.filter((item) => readStatus(item) === "completed").length,
+      inProgress: operationalDeliveries.filter((item) => readStatus(item) === "in_progress").length,
+      pending: operationalDeliveries.filter((item) => readStatus(item) === "pending").length,
+    };
+  }, [deliveries]);
 
   return (
     <section className="dashboard-page">
@@ -34,9 +38,9 @@ export default function Dashboard() {
       </div>
 
       <div className="dashboard-kpis">
-        <article className="kpi-card"><span>Total del día</span><strong>{loading ? "-" : summary.total}</strong><small>Entregas registradas</small></article>
-        <article className="kpi-card kpi-success"><span>Completadas</span><strong>{loading ? "-" : summary.delivered}</strong><small>Listas para cerrar</small></article>
-        <article className="kpi-card kpi-route"><span>En ruta</span><strong>{loading ? "-" : summary.inRoute}</strong><small>En movimiento</small></article>
+        <article className="kpi-card"><span>Total del día</span><strong>{loading ? "-" : summary.total}</strong><small>Entregas asignadas a ruta</small></article>
+        <article className="kpi-card kpi-success"><span>Completadas</span><strong>{loading ? "-" : summary.completed}</strong><small>Listas para cerrar</small></article>
+        <article className="kpi-card kpi-route"><span>En progreso</span><strong>{loading ? "-" : summary.inProgress}</strong><small>En movimiento</small></article>
         <article className="kpi-card kpi-pending"><span>Pendientes</span><strong>{loading ? "-" : summary.pending}</strong><small>Requieren seguimiento</small></article>
       </div>
 

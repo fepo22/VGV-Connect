@@ -8,11 +8,24 @@ import RoutePlanner from "./pages/RoutePlanner/Routeplanner";
 import Reportes from "./pages/Reportes/Reportes";
 import DashboardChofer from "./pages/Drivers/DashboardChofer";
 import RegistrarEntrega from "./pages/Drivers/entregas/RegistrarEntrega";
+import DriversOverview from "./pages/Drivers/DriversOverview";
 import useAuth from "./hooks/useAuth";
 
-function DriverRoute({ children }) {
+function RoleRoute({ roles, children }) {
   const { user } = useAuth();
-  return user?.role === "driver" ? children : <Navigate to="/" replace />;
+  return user && roles.includes(user.role) ? children : <Navigate to="/" replace />;
+}
+
+const roleHome = {
+  admin: "/dashboard",
+  route_planner: "/rutas",
+  billing: "/reportes",
+  driver: "/chofer",
+};
+
+function RoleHome() {
+  const { user } = useAuth();
+  return <Navigate to={roleHome[user?.role] || "/"} replace />;
 }
 
 export default function App() {
@@ -21,18 +34,18 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LoginPage />} />
         <Route element={<Layout />}>
-          <Route path="/home" element={<Home />} />
+          <Route path="/home" element={<RoleRoute roles={["admin", "route_planner", "billing"]}><Home /></RoleRoute>} />
           <Route path="/inicio" element={<Navigate to="/home" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/entregas" element={<DeliveriesPage />} />
-          <Route path="/rutas" element={<RoutePlanner />} />
+          <Route path="/dashboard" element={<RoleRoute roles={["admin", "route_planner", "billing"]}><Dashboard /></RoleRoute>} />
+          <Route path="/entregas" element={<RoleRoute roles={["admin", "route_planner", "billing"]}><DeliveriesPage /></RoleRoute>} />
+          <Route path="/rutas" element={<RoleRoute roles={["admin", "route_planner"]}><RoutePlanner /></RoleRoute>} />
           <Route path="/routeplanner" element={<Navigate to="/rutas" replace />} />
-          <Route path="/choferes" element={<Home />} />
-          <Route path="/reportes" element={<Reportes />} />
-          <Route path="/chofer" element={<DriverRoute><DashboardChofer /></DriverRoute>} />
-          <Route path="/chofer/entregas/:id" element={<DriverRoute><RegistrarEntrega /></DriverRoute>} />
+          <Route path="/choferes" element={<RoleRoute roles={["admin", "route_planner"]}><DriversOverview /></RoleRoute>} />
+          <Route path="/reportes" element={<RoleRoute roles={["admin", "billing"]}><Reportes /></RoleRoute>} />
+          <Route path="/chofer" element={<RoleRoute roles={["driver"]}><DashboardChofer /></RoleRoute>} />
+          <Route path="/chofer/entregas/:id" element={<RoleRoute roles={["driver"]}><RegistrarEntrega /></RoleRoute>} />
         </Route>
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<RoleHome />} />
       </Routes>
     </BrowserRouter>
   );

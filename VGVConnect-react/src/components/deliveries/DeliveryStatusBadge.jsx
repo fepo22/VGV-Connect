@@ -1,9 +1,22 @@
+import { normalizeDeliveryStatus } from "../../utils/deliveryStatus";
+
 export default function DeliveryStatusBadge({ status }) {
+  const normalized = normalizeDeliveryStatus(status);
   const colors = {
     pending: "#f0ad4e",
-    in_route: "#0275d8",
-    delivered: "#5cb85c",
-    failed: "#d9534f",
+    planned: "#5b7cfa",
+    in_progress: "#0275d8",
+    completed: "#5cb85c",
+    rejected: "#d9534f",
+    not_found: "#8d6e63",
+  };
+  const labels = {
+    pending: "Pendiente",
+    planned: "Planificado",
+    in_progress: "En progreso",
+    completed: "Completado",
+    rejected: "Rechazado",
+    not_found: "No encontrado",
   };
 
   return (
@@ -11,13 +24,13 @@ export default function DeliveryStatusBadge({ status }) {
       style={{
         padding: "4px 10px",
         borderRadius: "20px",
-        background: colors[status] || "#999",
+        background: colors[normalized] || "#999",
         color: "#fff",
         fontSize: "12px",
         fontWeight: "bold",
       }}
     >
-      {status.toUpperCase()}
+      {labels[normalized] || normalized}
     </span>
   );
 }

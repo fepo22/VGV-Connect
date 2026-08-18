@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  route_planner
+  billing
+  driver
+}
+
+enum RouteStatus {
+  draft
+  planned
+  in_progress
+  completed
+}
+
+enum DeliveryStatus {
+  pending
+  planned
+  in_progress
+  completed
+  rejected
+  not_found
+}
+
+model User {
+  id          Int          @id @default(autoincrement())
+  username    String       @unique
+  name        String
+  passwordHash String
+  role        UserRole
+  routes      Route[]      @relation("DriverRoutes")
+  auditLogs   AuditLog[]
+  deliveries  Delivery[]   @relation("DriverDeliveries")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Vehicle {
+  id           Int      @id @default(autoincrement())
+  name         String
+  licensePlate String   @unique
+  maxWeightKg  Decimal? @db.Decimal(10, 2)
+  maxVolumeM3  Decimal? @db.Decimal(10, 3)
+  routes       Route[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Route {
+  id          Int         @id @default(autoincrement())
+  serviceDate DateTime
+  deliveryDate DateTime?
+  startAt     DateTime
+  origin      String
+  destination String
+  distanceKm  Decimal? @db.Decimal(10, 2)
+  weightKg    Decimal? @db.Decimal(10, 2)
+  volumeM3    Decimal? @db.Decimal(10, 3)
+  documentType String
+  documentNumber String
+  status      RouteStatus @default(draft)
+  driverId    Int?
+  vehicleId   Int?
+  driver      User?       @relation("DriverRoutes", fields: [driverId], references: [id])
+  vehicle     Vehicle?    @relation(fields: [vehicleId], references: [id])
+  deliveries  Delivery[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([driverId, serviceDate])
+  @@index([vehicleId, serviceDate])
+}
+
+model Delivery {
+  id            Int            @id @default(autoincrement())
+  guideNumber   String?
+  clientName    String
+  address       String
+  street        String?
+  streetNumber  String?
+  commune       String?
+  region        String?
+  weightKg      Decimal? @db.Decimal(10, 2)
+  volumeM3      Decimal? @db.Decimal(10, 3)
+  status        DeliveryStatus @default(pending)
+  routeId       Int?
+  driverId      Int?
+  route         Route?         @relation(fields: [routeId], references: [id])
+  driver        User?          @relation("DriverDeliveries", fields: [driverId], references: [id])
+  photoUrl      String?
+  latitude      Decimal?       @db.Decimal(10, 7)
+  longitude     Decimal?       @db.Decimal(10, 7)
+  observations  String?
+  deliveredAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  events        DeliveryEvent[]
+
+  @@index([routeId])
+  @@index([driverId, status])
+}
+
+model DeliveryEvent {
+  id         Int      @id @default(autoincrement())
+  deliveryId Int
+  action     String
+  metadata   Json?
+  delivery   Delivery @relation(fields: [deliveryId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@index([deliveryId, createdAt])
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  action    String
+  entity    String
+  entityId  Int?
+  metadata  Json?
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([userId, createdAt])
+}

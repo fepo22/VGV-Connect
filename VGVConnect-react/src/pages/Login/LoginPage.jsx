@@ -7,28 +7,28 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [identifier, setIdentifier] = useState(""); // email o celular
-  const [password, setPassword] = useState("");     // password o PIN
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    // Validación mínima
     if (!identifier.trim() || !password.trim()) {
-      setError("Completa todos los campos");
-      return;
-    }
-
-    if (!identifier.includes("@") && !/^[0-9]{8,12}$/.test(identifier)) {
-      setError("Usa un correo de operación o un celular de chofer.");
+      setError("Completa usuario y contraseña.");
       return;
     }
 
     try {
       const user = await loginUser(identifier, password);
       login(user);
-      navigate(user.role === "driver" ? "/chofer" : "/dashboard");
+      const roleHome = {
+        driver: "/chofer",
+        route_planner: "/rutas",
+        billing: "/reportes",
+        admin: "/dashboard",
+      };
+      navigate(roleHome[user.role] || "/dashboard");
     } catch {
       setError("Credenciales inválidas.");
     }
@@ -47,7 +47,7 @@ export default function LoginPage() {
           </p>
         )}
 
-        <label>Correo o celular</label>
+        <label>Usuario</label>
         <input
           type="text"
           value={identifier}

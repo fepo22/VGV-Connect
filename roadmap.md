@@ -8,6 +8,7 @@ Estados: [x] terminado | [~] MVP o parcial | [ ] pendiente
 - [~] Backend Express operativo con autenticación JWT, roles, rutas, entregas y auditoría en memoria.
 - [~] Frontend React/Vite con Dashboard, planificador administrativo y flujo de chofer.
 - [~] Entregas vinculadas a rutas y choferes, con estados, observaciones, GPS y evidencia.
+- [~] Guías de despacho y patentes de camión modeladas; capacidades de peso y volumen preparadas.
 - [ ] Persistencia PostgreSQL y usuarios reales.
 - [ ] Integración productiva con Google Drive y Google Maps.
 
@@ -18,7 +19,9 @@ Estados: [x] terminado | [~] MVP o parcial | [ ] pendiente
 
 [~] Subida de evidencia preparada para Google Drive con fallback local
 
-[ ] Base de datos PostgreSQL con tablas principales
+[~] Esquema PostgreSQL/Prisma preparado para usuarios, vehículos, rutas, guías, entregas y auditoría
+
+[ ] Migrar datos mock a PostgreSQL y ejecutar migraciones
 
 [~] Auditoría y manejo básico de errores en memoria
 

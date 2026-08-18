@@ -1,131 +1,207 @@
-import { deliveries } from "../data/deliveries.mock.js";
-import { logAudit } from "../data/audit.mock.js";
+import prisma from "../prismaClient.js";
+import { logAudit } from "../services/audit.service.js";
+import { geocodeAddress } from "../services/geocoding.service.js";
 
-const drivers = [
-  { id: 1, name: "Carlos Mendoza" },
-  { id: 2, name: "Ana Torres" },
-  { id: 3, name: "Luis Rojas" },
-];
-
-const buildStops = (stopIds = deliveries.map((delivery) => delivery.id)) =>
-  stopIds
-    .map((stopId, index) => deliveries.find((delivery) => delivery.id === Number(stopId)))
-    .filter(Boolean)
-    .map((delivery, index) => ({
-      id: delivery.id,
-      client: delivery.cliente,
-      address: delivery.direccion,
-      status: delivery.estado,
-      location: delivery.location || {
-        lat: -33.45 - index * 0.02,
-        lng: -70.66 + index * 0.01,
-      },
-      sequence: index + 1,
-    }));
-
-let routePlans = [
-  {
-    id: 1,
-    name: "Ruta centro - turno mañana",
-    date: new Date().toISOString().slice(0, 10),
-    status: "planned",
-    driverId: 1,
-    driverName: drivers[0].name,
-    stops: buildStops(),
-  },
-];
-
-const withSummary = (route) => ({
-  ...route,
-  stopCount: route.stops.length,
-  coordinates: route.stops.map((stop) => stop.location),
-});
-
-export const syncRouteDelivery = (delivery) => {
-  const route = routePlans.find((item) => item.id === delivery.routeId);
-  const stop = route?.stops.find((item) => item.id === delivery.id);
-  if (stop) stop.status = delivery.estado;
-  if (route && delivery.estado === "completed" && route.stops.every((item) => item.status === "completed")) {
-    route.status = "completed";
-  }
+const drivers = async () => prisma.user.findMany({ where: { role: "driver" }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+const routeInclude = { driver: { select: { id: true, name: true } }, vehicle: true, deliveries: true };
+const toRoute = (route) => ({ ...route, date: route.serviceDate.toISOString().slice(0, 10), deliveryDate: route.deliveryDate?.toISOString().slice(0, 10) || "", startTime: route.startAt.toISOString().slice(11, 16), weightKg: route.weightKg === null ? null : Number(route.weightKg), volumeM3: route.volumeM3 === null ? null : Number(route.volumeM3), driverName: route.driver?.name || "Sin asignar", vehicleName: route.vehicle?.name || "Sin camión", vehicleLicensePlate: route.vehicle?.licensePlate || "Patente pendiente", stopCount: route.deliveries.length, stops: route.deliveries.map((delivery, index) => ({ id: delivery.id, guideNumber: delivery.guideNumber, client: delivery.clientName, address: delivery.address, status: delivery.status, sequence: index + 1, location: delivery.latitude !== null && delivery.longitude !== null ? { lat: Number(delivery.latitude), lng: Number(delivery.longitude) } : null })), coordinates: route.deliveries.filter((delivery) => delivery.latitude !== null && delivery.longitude !== null).map((delivery) => ({ lat: Number(delivery.latitude), lng: Number(delivery.longitude) })) });
+const startAt = (date, time) => new Date(`${date}T${time}:00`);
+const nextRouteName = async (date) => {
+  const dayStart = new Date(`${date}T00:00:00.000`);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+  const dailyRoutes = await prisma.route.count({ where: { serviceDate: { gte: dayStart, lt: dayEnd } } });
+  const formattedDate = date.split("-").reverse().join("-");
+  return `Ruta ${formattedDate} / ${String(dailyRoutes + 1).padStart(3, "0")}`;
+};
+const optionalDecimal = (value) => {
+  if (value === undefined) return undefined;
+  if (value == null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 };
 
-const syncDeliveryAssignments = (route) => {
-  route.stops.forEach((stop) => {
-    const delivery = deliveries.find((item) => item.id === stop.id);
-    if (delivery) {
-      delivery.routeId = route.id;
-      delivery.driverId = route.driverId;
-    }
-  });
+export const normalizeRouteStopInput = (stop = {}, fallbackStatus = "pending") => {
+  const id = stop.id == null || stop.id === "" ? null : Number(stop.id);
+  const client = String(stop.client || stop.clientName || "Punto de descarga").trim() || "Punto de descarga";
+  const address = String(stop.address || stop.direccion || "").trim();
+  const guideNumber = stop.guideNumber == null || stop.guideNumber === "" ? null : String(stop.guideNumber).trim();
+  return { id, client, address, guideNumber, status: stop.status || fallbackStatus };
 };
 
-export const getRoutes = (req, res) => {
-  const driverId = req.query.driverId;
-  const routes = driverId
-    ? routePlans.filter((route) => route.driverId === Number(driverId))
-    : routePlans;
-  res.json({ routes: routes.map(withSummary), drivers, availableStops: buildStops() });
-};
+export const planRouteStopChanges = (currentStops = [], incomingStops = []) => {
+  const currentMap = new Map((currentStops || []).filter((stop) => stop && stop.id != null).map((stop) => [Number(stop.id), stop]));
+  const normalizedIncoming = (incomingStops || []).map((stop) => normalizeRouteStopInput(stop, "pending"));
+  const incomingIds = new Set(normalizedIncoming.filter((stop) => stop.id != null && !Number.isNaN(stop.id)).map((stop) => stop.id));
 
-export const createRoute = (req, res) => {
-  const { name, date, driverId, stopIds } = req.body;
-  if (!name || !date) {
-    return res.status(400).json({ message: "El nombre y la fecha son obligatorios" });
-  }
-
-  const driver = drivers.find((item) => item.id === Number(driverId));
-  const route = {
-    id: Date.now(),
-    name,
-    date,
-    status: "draft",
-    driverId: driver?.id || null,
-    driverName: driver?.name || "Sin asignar",
-    stops: buildStops(stopIds),
+  return {
+    incoming: normalizedIncoming,
+    toCreate: normalizedIncoming.filter((stop) => stop.id == null || Number.isNaN(stop.id)),
+    toUpdate: normalizedIncoming.filter((stop) => stop.id != null && !Number.isNaN(stop.id)),
+    toRemove: (currentStops || []).filter((stop) => stop && stop.id != null && !incomingIds.has(Number(stop.id))),
+    currentMap,
   };
-
-  syncDeliveryAssignments(route);
-  routePlans = [...routePlans, route];
-  logAudit({ action: "route_created", userId: 10, role: "admin", entity: "route", entityId: route.id, metadata: { driverId: route.driverId, stopIds } });
-  return res.status(201).json(withSummary(route));
 };
 
-export const updateRoute = (req, res) => {
-  const route = routePlans.find((item) => item.id === Number(req.params.id));
-  if (!route) return res.status(404).json({ message: "Ruta no encontrada" });
-
-  const { name, date, status, driverId, stopIds } = req.body;
-  const driver = drivers.find((item) => item.id === Number(driverId));
-  deliveries.forEach((delivery) => {
-    if (delivery.routeId === route.id) {
-      delivery.routeId = null;
-      delivery.driverId = null;
-    }
-  });
-  Object.assign(route, {
-    ...(name && { name }),
-    ...(date && { date }),
-    ...(status && { status }),
-    ...(driverId !== undefined && { driverId: driver?.id || null, driverName: driver?.name || "Sin asignar" }),
-    ...(stopIds && { stops: buildStops(stopIds) }),
-  });
-
-  syncDeliveryAssignments(route);
-  logAudit({ action: "route_updated", userId: 10, role: "admin", entity: "route", entityId: route.id, metadata: { driverId, status, stopIds } });
-  return res.json(withSummary(route));
+export const getRoutes = async (req, res) => {
+  const where = req.user.role === "driver" ? { driverId: Number(req.user.sub) } : req.query.driverId ? { driverId: Number(req.query.driverId) } : undefined;
+  const [routes, driverList, vehicleList, availableStops] = await Promise.all([
+    prisma.route.findMany({ where, include: routeInclude, orderBy: { serviceDate: "desc" } }),
+    drivers(), prisma.vehicle.findMany({ orderBy: { licensePlate: "asc" } }),
+    prisma.delivery.findMany({ where: { routeId: null }, orderBy: { id: "asc" } }),
+  ]);
+  res.json({ routes: routes.map(toRoute), drivers: driverList, vehicles: vehicleList, availableStops });
 };
 
-export const optimizeRoute = (req, res) => {
-  const route = routePlans.find((item) => item.id === Number(req.params.id));
+export const getRoute = async (req, res) => {
+  const route = await prisma.route.findUnique({ where: { id: Number(req.params.id) }, include: routeInclude });
+  if (!route) return res.status(404).json({ message: "Ruta no encontrada" });
+  if (req.user.role === "driver" && route.driverId !== Number(req.user.sub)) return res.status(403).json({ message: "Ruta no asignada" });
+  res.json(toRoute(route));
+};
+
+export const createRoute = async (req, res) => {
+  const { date, deliveryDate, startTime, origin, destination, driverId, vehicleId, weightKg: rawWeightKg, volumeM3: rawVolumeM3, stops } = req.body;
+  if (!date || !startTime || !destination || driverId == null || vehicleId == null) return res.status(400).json({ message: "Chofer, patente, fecha, hora y destino son obligatorios" });
+  const weightKg = optionalDecimal(rawWeightKg);
+  const volumeM3 = optionalDecimal(rawVolumeM3);
+  if ((rawWeightKg !== undefined && weightKg === undefined) || (rawVolumeM3 !== undefined && volumeM3 === undefined)) return res.status(400).json({ message: "Peso y volumen deben ser valores numéricos positivos" });
+
+  const [driver, vehicle] = await Promise.all([
+    prisma.user.findFirst({ where: { id: Number(driverId), role: "driver" } }),
+    prisma.vehicle.findUnique({ where: { id: Number(vehicleId) } }),
+  ]);
+  if (!driver || !vehicle) return res.status(400).json({ message: "Chofer o patente no válidos" });
+
+  const [originLocation, destinationLocation] = await Promise.all([geocodeAddress(origin), geocodeAddress(destination)]);
+  const routeName = await nextRouteName(date);
+  const route = await prisma.route.create({
+    data: {
+      serviceDate: new Date(`${date}T00:00:00`),
+      deliveryDate: deliveryDate ? new Date(`${deliveryDate}T00:00:00`) : null,
+      startAt: startAt(date, startTime),
+      origin: origin || "",
+      destination,
+      weightKg: weightKg ?? null,
+      volumeM3: volumeM3 ?? null,
+      documentType: "route",
+      documentNumber: routeName,
+      driverId: driver.id,
+      vehicleId: vehicle.id,
+    },
+    include: routeInclude,
+  });
+
+  if (Array.isArray(stops) && stops.length) {
+    const stopRows = stops.map((stop) => {
+      const nextStop = normalizeRouteStopInput(stop, "pending");
+      return {
+        routeId: route.id,
+        driverId: driver.id,
+        clientName: nextStop.client,
+        address: nextStop.address,
+        guideNumber: nextStop.guideNumber,
+        status: nextStop.status,
+      };
+    });
+
+    await prisma.delivery.createMany({ data: stopRows });
+  }
+
+  const routeWithStops = await prisma.route.findUnique({ where: { id: route.id }, include: routeInclude });
+  await logAudit({ action: "route_created", userId: req.user.sub, entity: "route", entityId: route.id, metadata: { originLocation, destinationLocation } });
+  res.status(201).json({ ...toRoute(routeWithStops), originLocation, destinationLocation });
+};
+
+export const updateRoute = async (req, res) => {
+  const route = await prisma.route.findUnique({ where: { id: Number(req.params.id) } });
   if (!route) return res.status(404).json({ message: "Ruta no encontrada" });
 
-  route.stops = [...route.stops].sort((first, second) => {
-    if (first.status === second.status) return first.id - second.id;
-    return first.status === "in_route" ? -1 : 1;
-  }).map((stop, index) => ({ ...stop, sequence: index + 1 }));
+  const { date, deliveryDate, startTime, origin, destination, documentType, documentNumber, status, driverId, vehicleId, weightKg: rawWeightKg, volumeM3: rawVolumeM3, stops } = req.body;
+  const weightKg = optionalDecimal(rawWeightKg);
+  const volumeM3 = optionalDecimal(rawVolumeM3);
+  if ((rawWeightKg !== undefined && weightKg === undefined) || (rawVolumeM3 !== undefined && volumeM3 === undefined)) return res.status(400).json({ message: "Peso y volumen deben ser valores numéricos positivos" });
+  const updated = await prisma.route.update({
+    where: { id: route.id },
+    data: {
+      serviceDate: date ? new Date(`${date}T00:00:00`) : undefined,
+      deliveryDate: deliveryDate === undefined ? undefined : deliveryDate ? new Date(`${deliveryDate}T00:00:00`) : null,
+      startAt: startTime ? startAt(date || route.serviceDate.toISOString().slice(0, 10), startTime) : undefined,
+      origin,
+      destination,
+      weightKg,
+      volumeM3,
+      documentType,
+      documentNumber,
+      status,
+      driverId: driverId === undefined ? undefined : Number(driverId),
+      vehicleId: vehicleId === undefined ? undefined : Number(vehicleId),
+    },
+    include: routeInclude,
+  });
 
-  route.status = route.status === "draft" ? "planned" : route.status;
-  logAudit({ action: "route_optimized", userId: 10, role: "admin", entity: "route", entityId: route.id });
-  return res.json(withSummary(route));
+  if (Array.isArray(stops)) {
+    const currentStops = await prisma.delivery.findMany({
+      where: { routeId: route.id },
+      select: { id: true, clientName: true, address: true, guideNumber: true, status: true },
+    });
+    const { toCreate, toUpdate, toRemove } = planRouteStopChanges(currentStops, stops);
+
+    await prisma.$transaction(async (tx) => {
+      if (toRemove.length) {
+        await tx.delivery.updateMany({
+          where: { id: { in: toRemove.map((stop) => stop.id) } },
+          data: { routeId: null, driverId: null },
+        });
+      }
+
+      for (const stop of toCreate) {
+        await tx.delivery.create({
+          data: {
+            routeId: route.id,
+            driverId: driverId == null ? route.driverId : Number(driverId),
+            clientName: stop.client,
+            address: stop.address,
+            guideNumber: stop.guideNumber,
+            status: stop.status,
+          },
+        });
+      }
+
+      for (const stop of toUpdate) {
+        await tx.delivery.update({
+          where: { id: stop.id },
+          data: {
+            routeId: route.id,
+            driverId: driverId == null ? route.driverId : Number(driverId),
+            clientName: stop.client,
+            address: stop.address,
+            guideNumber: stop.guideNumber,
+            status: stop.status,
+          },
+        });
+      }
+    });
+  }
+
+  const finalRoute = await prisma.route.findUnique({ where: { id: route.id }, include: routeInclude });
+  await logAudit({ action: "route_updated", userId: req.user.sub, entity: "route", entityId: route.id });
+  res.json(toRoute(finalRoute));
+};
+
+export const deleteRoute = async (req, res) => {
+  const id = Number(req.params.id);
+  const route = await prisma.route.findUnique({ where: { id } });
+  if (!route) return res.status(404).json({ message: "Ruta no encontrada" });
+  await prisma.$transaction([prisma.delivery.updateMany({ where: { routeId: id }, data: { routeId: null, driverId: null } }), prisma.route.delete({ where: { id } })]);
+  await logAudit({ action: "route_deleted", userId: req.user.sub, entity: "route", entityId: id });
+  res.status(204).send();
+};
+
+export const optimizeRoute = async (req, res) => {
+  const route = await prisma.route.findUnique({ where: { id: Number(req.params.id) }, include: routeInclude });
+  if (!route) return res.status(404).json({ message: "Ruta no encontrada" });
+  const updated = await prisma.route.update({ where: { id: route.id }, data: { status: route.status === "draft" ? "planned" : route.status }, include: routeInclude });
+  await logAudit({ action: "route_optimized", userId: req.user.sub, entity: "route", entityId: route.id });
+  res.json(toRoute(updated));
 };

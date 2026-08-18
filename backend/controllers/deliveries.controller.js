@@ -1,78 +1,65 @@
-import { deliveries } from "../data/deliveries.mock.js";
-import { logAudit } from "../data/audit.mock.js";
-import { syncRouteDelivery } from "./routes.controller.js";
+import prisma from "../prismaClient.js";
+import { logAudit, logDeliveryEvent } from "../services/audit.service.js";
 import { uploadPhoto } from "../services/google-drive.service.js";
 
-const allowedStatuses = ["pending", "in_progress", "completed", "rejected", "not_found", "delivered"];
+const normalize = (delivery) => ({
+  id: delivery.id,
+  driverId: delivery.driverId,
+  routeId: delivery.routeId,
+  guideNumber: delivery.guideNumber,
+  client: delivery.clientName,
+  cliente: delivery.clientName,
+  address: delivery.address,
+  direccion: delivery.address,
+  status: delivery.status,
+  estado: delivery.status,
+  photoUrl: delivery.photoUrl,
+  location: delivery.latitude !== null && delivery.longitude !== null ? { lat: Number(delivery.latitude), lng: Number(delivery.longitude) } : null,
+  observations: delivery.observations,
+  weightKg: delivery.weightKg,
+  volumeM3: delivery.volumeM3,
+  deliveredAt: delivery.deliveredAt,
+  driverName: delivery.driver?.name || null,
+  route: delivery.route ? {
+    id: delivery.route.id,
+    documentType: delivery.route.documentType,
+    documentNumber: delivery.route.documentNumber,
+    serviceDate: delivery.route.serviceDate,
+    deliveryDate: delivery.route.deliveryDate,
+  } : null,
+});
 
-export const getDeliveries = (req, res) => {
+export const getDeliveries = async (req, res) => {
   const driverId = req.user.role === "driver" ? req.user.sub : req.query.driverId;
-  const result = driverId
-    ? deliveries.filter((delivery) => delivery.driverId === Number(driverId))
-    : deliveries;
-  res.json(result);
+  const deliveries = await prisma.delivery.findMany({
+    where: driverId ? { driverId: Number(driverId) } : undefined,
+    include: {
+      driver: { select: { name: true } },
+      route: { select: { id: true, documentType: true, documentNumber: true, serviceDate: true, deliveryDate: true } },
+    },
+    orderBy: { id: "asc" },
+  });
+  return res.json(deliveries.map(normalize));
 };
 
-export const updateDeliveryStatus = (req, res) => {
-  const { id } = req.params;
-  const { status, photoUrl, location, observations, timestamp, driverId } = req.body;
-
-  const delivery = deliveries.find((d) => d.id === Number(id));
-
-  if (!delivery) {
-    return res.status(404).json({ message: "Delivery not found" });
-  }
-
-  if (!allowedStatuses.includes(status)) {
-    return res.status(400).json({ message: "Estado de entrega inválido" });
-  }
-
-  const currentStatus = delivery.estado === "in_route" ? "in_progress" : delivery.estado;
-  const nextStatus = status === "delivered" ? "completed" : status;
-  const canTransition = currentStatus === nextStatus ||
-    (currentStatus === "pending" && ["in_progress", "rejected", "not_found"].includes(nextStatus)) ||
-    (currentStatus === "in_progress" && ["completed", "rejected", "not_found"].includes(nextStatus));
-
-  if (!canTransition) {
-    return res.status(409).json({ message: `No se puede pasar de ${currentStatus} a ${nextStatus}` });
-  }
-
-  if (req.user.role === "driver" && delivery.driverId !== Number(req.user.sub)) {
-    return res.status(403).json({ message: "La entrega no está asignada a este chofer" });
-  }
-
-  delivery.estado = nextStatus;
-  if (photoUrl !== undefined) delivery.photoUrl = photoUrl;
-  if (location !== undefined) delivery.location = location;
-  if (observations !== undefined) delivery.observations = observations;
-  if (timestamp !== undefined) delivery.completedAt = timestamp;
-  syncRouteDelivery(delivery);
-  logAudit({
-    action: "delivery_updated",
-    userId: req.user.sub,
-    role: req.user.role,
-    entity: "delivery",
-    entityId: delivery.id,
-    metadata: { status: nextStatus, location, observations, photoUrl: Boolean(photoUrl), timestamp },
-  });
-
-  res.json({ message: "Status updated", delivery });
+export const updateDeliveryStatus = async (req, res) => {
+  const delivery = await prisma.delivery.findUnique({ where: { id: Number(req.params.id) } });
+  if (!delivery) return res.status(404).json({ message: "Delivery not found" });
+  if (req.user.role === "driver" && delivery.driverId !== Number(req.user.sub)) return res.status(403).json({ message: "Entrega no asignada" });
+  const nextStatus = req.body.status === "delivered" ? "completed" : req.body.status;
+  if (!["pending", "planned", "in_progress", "completed", "rejected", "not_found"].includes(nextStatus)) return res.status(400).json({ message: "Estado inválido" });
+  const updated = await prisma.delivery.update({ where: { id: delivery.id }, data: { status: nextStatus, photoUrl: req.body.photoUrl, observations: req.body.observations, latitude: req.body.location?.lat, longitude: req.body.location?.lng, deliveredAt: nextStatus === "completed" ? new Date(req.body.timestamp || Date.now()) : undefined } });
+  await logDeliveryEvent({ deliveryId: delivery.id, action: "delivery_updated", metadata: { status: nextStatus, location: req.body.location, observations: req.body.observations } });
+  await logAudit({ action: "delivery_updated", userId: req.user.sub, entity: "delivery", entityId: delivery.id, metadata: { status: nextStatus } });
+  return res.json({ message: "Status updated", delivery: normalize(updated) });
 };
 
 export const uploadDeliveryPhoto = async (req, res) => {
-  const delivery = deliveries.find((item) => item.id === Number(req.params.id));
+  const delivery = await prisma.delivery.findUnique({ where: { id: Number(req.params.id) } });
   if (!delivery) return res.status(404).json({ message: "Delivery not found" });
-  if (req.user.role === "driver" && delivery.driverId !== Number(req.user.sub)) {
-    return res.status(403).json({ message: "La entrega no está asignada a este chofer" });
-  }
-  if (!req.body.photoData) return res.status(400).json({ message: "Foto requerida" });
-
-  try {
-    const result = await uploadPhoto(req.body.photoData, `delivery-${delivery.id}-${Date.now()}.jpg`);
-    delivery.photoUrl = result.url;
-    logAudit({ action: "delivery_photo_uploaded", userId: req.user.sub, role: req.user.role, entity: "delivery", entityId: delivery.id, metadata: { external: result.external } });
-    return res.json(result);
-  } catch (error) {
-    return res.status(502).json({ message: "No se pudo subir la foto", detail: error.message });
-  }
+  if (req.user.role === "driver" && delivery.driverId !== Number(req.user.sub)) return res.status(403).json({ message: "Entrega no asignada" });
+  const result = await uploadPhoto(req.body.photoData, `delivery-${delivery.id}-${Date.now()}.jpg`);
+  await prisma.delivery.update({ where: { id: delivery.id }, data: { photoUrl: result.url } });
+  await logDeliveryEvent({ deliveryId: delivery.id, action: "photo_uploaded", metadata: { external: result.external } });
+  return res.json(result);
 };
