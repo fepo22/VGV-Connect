@@ -29,8 +29,21 @@ export default function LoginPage() {
         admin: "/dashboard",
       };
       navigate(roleHome[user.role] || "/dashboard");
-    } catch {
-      setError("Credenciales inválidas.");
+    } catch (error) {
+      const apiMessage = error?.response?.data?.message;
+      if (apiMessage) {
+        setError(apiMessage);
+        return;
+      }
+      if (error?.message?.includes("VITE_API_URL")) {
+        setError("Configuracion faltante: define VITE_API_URL con la URL del backend.");
+        return;
+      }
+      if (error?.request) {
+        setError("No se pudo conectar con el servidor.");
+        return;
+      }
+      setError("No fue posible iniciar sesion.");
     }
   };
 

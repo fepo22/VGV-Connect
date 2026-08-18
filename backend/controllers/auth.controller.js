@@ -1,9 +1,11 @@
 import bcrypt from "bcryptjs";
 import prisma from "../prismaClient.js";
 import { logAudit } from "../services/audit.service.js";
+import { ensureDemoUsers } from "../services/bootstrap-users.service.js";
 import { signUserToken } from "../middleware/auth.middleware.js";
 
 export const login = async (req, res) => {
+  await ensureDemoUsers();
   const key = String(req.body.identifier || "").trim();
   const user = await prisma.user.findFirst({ where: { username: { equals: key, mode: "insensitive" } } });
   if (!user || !(await bcrypt.compare(req.body.password || "", user.passwordHash))) {
