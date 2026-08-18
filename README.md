@@ -124,7 +124,7 @@ El seed limpia el dataset operativo (`routes`, `deliveries`, eventos y auditorí
 
 Despliega tres servicios dentro de un proyecto Railway:
 
-1. Crea una base PostgreSQL y configura el servicio backend con raíz `backend/`.
+1. Crea una base PostgreSQL y despliega el repositorio desde la raíz. El `railway.toml` principal instala e inicia el servicio de `backend/` automáticamente.
 2. Configura `DATABASE_URL` desde el plugin PostgreSQL, `JWT_SECRET` seguro y `CORS_ORIGINS` con la URL pública del frontend.
 3. Railway ejecuta `npm start`, que aplica `prisma migrate deploy` antes de iniciar el API. Verifica `https://TU-BACKEND/health` y `https://TU-BACKEND/api-docs/`.
 4. Crea el servicio frontend con raíz `VGVConnect-react/` y define `VITE_API_URL=https://TU-BACKEND` antes del build.

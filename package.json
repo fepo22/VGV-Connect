@@ -1,0 +1,12 @@
+{
+  "name": "vgv-connect-railway",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm --prefix backend ci && npm --prefix backend run db:generate",
+    "start": "npm --prefix backend start"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
