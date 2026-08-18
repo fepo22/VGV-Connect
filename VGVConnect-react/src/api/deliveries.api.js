@@ -1,6 +1,7 @@
 import http from "./http";
 
-export const getDeliveries = () => http.get("/deliveries");
+export const getDeliveries = (driverId) =>
+  http.get("/deliveries", { params: driverId ? { driverId } : undefined });
 
 export const updateDeliveryStatus = (id, status) =>
   http.put(`/deliveries/${id}/status`, { status });

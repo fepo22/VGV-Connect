@@ -1,8 +1,12 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 
 export default function MapView({ coordinates }) {
   useEffect(() => {
-    if (!coordinates || coordinates.length === 0) return;
+    if (
+      !coordinates ||
+      coordinates.length === 0 ||
+      !window.google?.maps
+    ) return;
 
     // Ejemplo con Google Maps
     const map = new window.google.maps.Map(document.getElementById("map"), {
@@ -28,5 +32,11 @@ export default function MapView({ coordinates }) {
     path.setMap(map);
   }, [coordinates]);
 
-  return <div id="map" style={{ height: "400px", marginTop: "20px" }} />;
+  return (
+    <div id="map" style={{ height: "400px", marginTop: "20px" }}>
+      {coordinates?.length > 0 && !window.google?.maps && (
+        <p>Mapa no disponible: configura Google Maps para visualizar la ruta.</p>
+      )}
+    </div>
+  );
 }

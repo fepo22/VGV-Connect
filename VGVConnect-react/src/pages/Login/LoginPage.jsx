@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { loginUser } from "../../api/auth.api";
+import useAuth from "../../hooks/useAuth";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const [identifier, setIdentifier] = useState(""); // email o celular
   const [password, setPassword] = useState("");     // password o PIN
@@ -17,59 +20,49 @@ export default function LoginPage() {
       return;
     }
 
-    // Detectar si es celular o correo
-    const isPhone = /^[0-9]{8,12}$/.test(identifier);
-    const isEmail = identifier.includes("@");
-
-    // MVP: lógica temporal sin backend
-    if (isPhone) {
-      // Chofer
-      navigate("/entregas");
+    if (!identifier.includes("@") && !/^[0-9]{8,12}$/.test(identifier)) {
+      setError("Usa un correo de operación o un celular de chofer.");
       return;
     }
 
-    if (isEmail) {
-      // Programador o Gerencia
-      navigate("/dashboard");
-      return;
+    try {
+      const user = await loginUser(identifier, password);
+      login(user);
+      navigate(user.role === "driver" ? "/chofer" : "/dashboard");
+    } catch {
+      setError("Credenciales inválidas.");
     }
-
-    setError("Formato inválido. Usa correo o número de celular.");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <form
-        onSubmit={handleLogin}
-        className="bg-white p-8 rounded shadow-md w-full max-w-sm"
-      >
-        <h1 className="text-2xl font-bold mb-6 text-center">VGV Connect</h1>
+    <div className="login-screen">
+      <form onSubmit={handleLogin} className="login-card">
+        <span className="brand-mark">V</span>
+        <h1>VGV Connect</h1>
+        <p>Gestiona entregas y rutas desde un solo lugar.</p>
 
         {error && (
-          <p className="bg-red-100 text-red-700 p-2 rounded mb-4 text-sm">
+          <p className="login-error">
             {error}
           </p>
         )}
 
-        <label className="block mb-2 text-sm font-medium">Correo o celular</label>
+        <label>Correo o celular</label>
         <input
           type="text"
-          className="w-full p-2 border rounded mb-4"
           value={identifier}
           onChange={(e) => setIdentifier(e.target.value)}
         />
 
-        <label className="block mb-2 text-sm font-medium">Contraseña / PIN</label>
+        <label>Contraseña / PIN</label>
         <input
           type="password"
-          className="w-full p-2 border rounded mb-6"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
 
         <button
           type="submit"
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
         >
           Ingresar
         </button>

@@ -1,23 +1,24 @@
-import React from "react";
-
-export default function RouteList({ routes, onOptimize, onSelect }) {
+export default function RouteList({ routes, selectedId, onSelect }) {
   if (!routes || routes.length === 0) {
-    return <p>No hay rutas asignadas.</p>;
+    return <p className="route-empty">No hay rutas creadas.</p>;
   }
 
   return (
-    <div>
-      <h2>Mis Rutas</h2>
-      <button onClick={onOptimize}>Optimizar Ruta</button>
-      <ul>
-        {routes.map((route) => (
-          <li key={route.id} style={{ margin: "10px 0" }}>
-            <strong>{route.address}</strong> — {route.status}
-            <br />
-            <button onClick={() => onSelect(route)}>Registrar entrega</button>
-          </li>
-        ))}
-      </ul>
+    <div className="route-list">
+      {routes.map((route) => (
+        <button
+          className={`route-row ${selectedId === route.id ? "is-selected" : ""}`}
+          key={route.id}
+          onClick={() => onSelect(route)}
+          type="button"
+        >
+          <span className="route-row-main">
+            <strong>{route.name}</strong>
+            <small>{route.date} · {route.stopCount} paradas</small>
+          </span>
+          <span className={`route-status route-status-${route.status}`}>{route.status}</span>
+        </button>
+      ))}
     </div>
   );
 }

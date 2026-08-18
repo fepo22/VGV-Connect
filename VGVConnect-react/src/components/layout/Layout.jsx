@@ -1,24 +1,14 @@
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
+import { Outlet } from "react-router-dom";
 
-export default function Layout({ children }) {
+export default function Layout() {
   return (
-    <div style={{ display: "flex" }}>
+    <div className="app-shell">
       <Sidebar />
-
-      <div
-        style={{
-          flex: 1,
-          marginLeft: "240px",
-          background: "#f5f6fa",
-          minHeight: "100vh",
-        }}
-      >
+      <div className="app-main">
         <Navbar />
-
-        <div style={{ padding: "20px" }}>
-          {children}
-        </div>
+        <main className="page-content"><Outlet /></main>
       </div>
     </div>
   );

@@ -1,46 +1,16 @@
-import { Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
 export default function Sidebar() {
+  const links = [["/dashboard", "⌂", "Dashboard"], ["/entregas", "▣", "Entregas"], ["/rutas", "↗", "Rutas"], ["/choferes", "◉", "Choferes"], ["/reportes", "▤", "Reportes"]];
+
   return (
-    <aside
-      style={{
-        width: "220px",
-        background: "#2c3e50",
-        color: "#ecf0f1",
-        minHeight: "100vh",
-        padding: "20px",
-      }}
-    >
-      <h2 style={{ marginBottom: "30px" }}>VGV Connect</h2>
-      <nav>
-        <ul style={{ listStyle: "none", padding: 0 }}>
-          <li style={{ marginBottom: "15px" }}>
-            <Link to="/dashboard" style={{ color: "#ecf0f1", textDecoration: "none" }}>
-              🏠 Dashboard
-            </Link>
-          </li>
-          <li style={{ marginBottom: "15px" }}>
-            <Link to="/entregas" style={{ color: "#ecf0f1", textDecoration: "none" }}>
-              📦 Entregas
-            </Link>
-          </li>
-          <li style={{ marginBottom: "15px" }}>
-            <Link to="/choferes" style={{ color: "#ecf0f1", textDecoration: "none" }}>
-              🚚 Choferes
-            </Link>
-          </li>
-          <li style={{ marginBottom: "15px" }}>
-            <Link to="/rutas" style={{ color: "#ecf0f1", textDecoration: "none" }}>
-              🛣️ Rutas
-            </Link>
-          </li>
-          <li style={{ marginBottom: "15px" }}>
-            <Link to="/reportes" style={{ color: "#ecf0f1", textDecoration: "none" }}>
-              📊 Reportes
-            </Link>
-          </li>
-        </ul>
+    <aside className="sidebar">
+      <div className="brand-lockup"><span className="brand-mark">V</span><span><strong>VGV</strong><small>Connect</small></span></div>
+      <p className="sidebar-label">Operación</p>
+      <nav className="sidebar-nav" aria-label="Navegación principal">
+        {links.map(([to, icon, label]) => <NavLink key={to} to={to} className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}><span className="nav-icon" aria-hidden="true">{icon}</span>{label}</NavLink>)}
       </nav>
+      <div className="sidebar-status"><span /> Sistema operativo</div>
     </aside>
   );
 }

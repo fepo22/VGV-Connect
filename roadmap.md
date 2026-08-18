@@ -1,32 +1,40 @@
 
-🛣️ ROADMAP OFICIAL – VGV CONNECT
-Fase 1 — Plataforma Base (0–2 meses)
-Objetivo: Tener el sistema funcionando con rutas, entregas y choferes.
+🛣️ ROADMAP OFICIAL - VGV CONNECT
 
-🔹 Backend
-[ ] API REST completa (auth, rutas, entregas, choferes, dashboard)
+Estados: [x] terminado | [~] MVP o parcial | [ ] pendiente
 
-[ ] JWT + roles (Admin, Operaciones, Chofer)
+## Estado actual
 
-[ ] Integración Google Drive (subida de fotos)
+- [~] Backend Express operativo con autenticación JWT, roles, rutas, entregas y auditoría en memoria.
+- [~] Frontend React/Vite con Dashboard, planificador administrativo y flujo de chofer.
+- [~] Entregas vinculadas a rutas y choferes, con estados, observaciones, GPS y evidencia.
+- [ ] Persistencia PostgreSQL y usuarios reales.
+- [ ] Integración productiva con Google Drive y Google Maps.
+
+### Backend
+[x] API base de auth, rutas, entregas y auditoría
+
+[~] JWT + roles Admin y Chofer; falta persistencia y permisos completos de Operaciones
+
+[~] Subida de evidencia preparada para Google Drive con fallback local
 
 [ ] Base de datos PostgreSQL con tablas principales
 
-[ ] Logs y manejo de errores
+[~] Auditoría y manejo básico de errores en memoria
 
-🔹 Frontend
-[ ] Login + persistencia de sesión
+### Frontend
+[x] Login con sesión local y roles
 
-[ ] Módulo Rutas (listado, creación, asignación)
+[x] Planificador de rutas: creación, asignación, paradas, estados y optimización MVP
 
-[ ] Módulo Entregas (listado, detalle, actualización)
+[x] Flujo de chofer: entregas asignadas, estado, foto, GPS y observaciones
 
-[ ] Subida de fotos desde navegador
+[x] Dashboard central y dashboard personal del chofer
 
-[ ] Dashboard básico (entregas del día, atrasos)
+[~] Reportes con métricas básicas; faltan filtros e históricos
 
-🔹 Infraestructura
-[ ] Variables .env organizadas
+### Infraestructura
+[x] `.env.example` para JWT y Google Drive
 
 [ ] Deploy inicial backend (VPS o cloud)
 
@@ -35,14 +43,14 @@ Objetivo: Tener el sistema funcionando con rutas, entregas y choferes.
 Fase 2 — Optimización Operativa (2–4 meses)
 Objetivo: Mejorar la eficiencia del flujo operativo y la experiencia del chofer.
 
-🔹 Backend
+### Backend
 [ ] Endpoints para métricas avanzadas
 
 [ ] Cache de KPIs (Redis opcional)
 
-[ ] Validaciones más estrictas en rutas y entregas
+[x] Validaciones de estados, permisos y transiciones de entregas
 
-🔹 Frontend
+### Frontend
 [ ] Dashboard gerencial completo
 
 [ ] Filtros avanzados (por chofer, zona, fecha)
@@ -54,12 +62,12 @@ Objetivo: Mejorar la eficiencia del flujo operativo y la experiencia del chofer.
 🔹 UX / UI
 [ ] Rediseño visual del módulo de chofer
 
-[ ] Flujo simplificado de “marcar entrega”
+[x] Flujo simplificado de “marcar entrega”
 
 Fase 3 — App Móvil para Choferes (4–8 meses)
 Objetivo: Independizar al chofer del navegador y mejorar la captura de datos.
 
-🔹 App Móvil (Flutter)
+### App Móvil (Flutter)
 [ ] Login + sesión persistente
 
 [ ] Ver rutas asignadas
@@ -74,12 +82,12 @@ Objetivo: Independizar al chofer del navegador y mejorar la captura de datos.
 
 [ ] Guardado offline (modo sin señal)
 
-🔹 Backend
+### Backend
 [ ] Endpoints optimizados para móvil
 
 [ ] Sincronización offline → online
 
-[ ] Registro de GPS al momento de entrega
+[x] Registro de GPS al momento de entrega en el flujo web
 
 Fase 4 — Inteligencia Operacional (8–12 meses)
 Objetivo: Convertir VGV Connect en una plataforma inteligente.
