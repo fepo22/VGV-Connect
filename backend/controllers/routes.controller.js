@@ -1,6 +1,7 @@
 import prisma from "../prismaClient.js";
 import { logAudit } from "../services/audit.service.js";
 import { geocodeAddress } from "../services/geocoding.service.js";
+import { canTransitionDelivery, canTransitionRoute } from "../services/status-transitions.service.js";
 
 const drivers = async () => prisma.user.findMany({ where: { role: "driver" }, select: { id: true, name: true }, orderBy: { name: "asc" } });
 const routeInclude = { driver: { select: { id: true, name: true } }, vehicle: true, deliveries: true };
@@ -118,6 +119,11 @@ export const updateRoute = async (req, res) => {
   if (!route) return res.status(404).json({ message: "Ruta no encontrada" });
 
   const { date, deliveryDate, startTime, origin, destination, documentType, documentNumber, status, driverId, vehicleId, weightKg: rawWeightKg, volumeM3: rawVolumeM3, stops } = req.body;
+  if (status !== undefined && !canTransitionRoute(route.status, status)) return res.status(400).json({ message: `Transición de ruta no permitida: ${route.status} a ${status}` });
+  if (status === "completed") {
+    const unresolvedStops = await prisma.delivery.count({ where: { routeId: route.id, status: { notIn: ["completed", "rejected", "not_found"] } } });
+    if (unresolvedStops) return res.status(400).json({ message: "No se puede completar la ruta mientras existan puntos sin resultado final" });
+  }
   const weightKg = optionalDecimal(rawWeightKg);
   const volumeM3 = optionalDecimal(rawVolumeM3);
   if ((rawWeightKg !== undefined && weightKg === undefined) || (rawVolumeM3 !== undefined && volumeM3 === undefined)) return res.status(400).json({ message: "Peso y volumen deben ser valores numéricos positivos" });
@@ -145,17 +151,28 @@ export const updateRoute = async (req, res) => {
       where: { routeId: route.id },
       select: { id: true, clientName: true, address: true, guideNumber: true, status: true },
     });
-    const { toCreate, toUpdate, toRemove } = planRouteStopChanges(currentStops, stops);
+    const stopChanges = planRouteStopChanges(currentStops, stops);
+    const assignableStops = await prisma.delivery.findMany({
+      where: { id: { in: stopChanges.toUpdate.filter((stop) => !stopChanges.currentMap.has(stop.id)).map((stop) => stop.id) }, routeId: null },
+      select: { id: true, status: true },
+    });
+    const assignableIds = new Set(assignableStops.map((stop) => stop.id));
+    const toAssign = stopChanges.toUpdate.filter((stop) => !stopChanges.currentMap.has(stop.id) && assignableIds.has(stop.id));
+    const toUpdate = stopChanges.toUpdate.filter((stop) => stopChanges.currentMap.has(stop.id));
+    const invalidStop = toUpdate.find((stop) => !canTransitionDelivery(stopChanges.currentMap.get(stop.id)?.status, stop.status));
+    if (invalidStop) return res.status(400).json({ message: `Transición de entrega no permitida: ${stopChanges.currentMap.get(invalidStop.id)?.status} a ${invalidStop.status}` });
+    const unknownStops = stopChanges.toUpdate.filter((stop) => !stopChanges.currentMap.has(stop.id) && !assignableIds.has(stop.id));
+    if (unknownStops.length) return res.status(400).json({ message: "Una o más entregas no están disponibles para asignar" });
 
     await prisma.$transaction(async (tx) => {
-      if (toRemove.length) {
+      if (stopChanges.toRemove.length) {
         await tx.delivery.updateMany({
-          where: { id: { in: toRemove.map((stop) => stop.id) } },
+          where: { id: { in: stopChanges.toRemove.map((stop) => stop.id) } },
           data: { routeId: null, driverId: null },
         });
       }
 
-      for (const stop of toCreate) {
+      for (const stop of stopChanges.toCreate) {
         await tx.delivery.create({
           data: {
             routeId: route.id,
@@ -163,7 +180,20 @@ export const updateRoute = async (req, res) => {
             clientName: stop.client,
             address: stop.address,
             guideNumber: stop.guideNumber,
-            status: stop.status,
+            status: "pending",
+          },
+        });
+      }
+
+      for (const stop of toAssign) {
+        await tx.delivery.update({
+          where: { id: stop.id },
+          data: {
+            routeId: route.id,
+            driverId: driverId == null ? route.driverId : Number(driverId),
+            clientName: stop.client,
+            address: stop.address,
+            guideNumber: stop.guideNumber,
           },
         });
       }
@@ -185,8 +215,12 @@ export const updateRoute = async (req, res) => {
   }
 
   const finalRoute = await prisma.route.findUnique({ where: { id: route.id }, include: routeInclude });
+  if (status === "planned") {
+    await prisma.delivery.updateMany({ where: { routeId: route.id, status: "pending" }, data: { status: "planned" } });
+  }
   await logAudit({ action: "route_updated", userId: req.user.sub, entity: "route", entityId: route.id });
-  res.json(toRoute(finalRoute));
+  const routeWithUpdatedStops = status === "planned" ? await prisma.route.findUnique({ where: { id: route.id }, include: routeInclude }) : finalRoute;
+  res.json(toRoute(routeWithUpdatedStops));
 };
 
 export const deleteRoute = async (req, res) => {
@@ -201,7 +235,11 @@ export const deleteRoute = async (req, res) => {
 export const optimizeRoute = async (req, res) => {
   const route = await prisma.route.findUnique({ where: { id: Number(req.params.id) }, include: routeInclude });
   if (!route) return res.status(404).json({ message: "Ruta no encontrada" });
-  const updated = await prisma.route.update({ where: { id: route.id }, data: { status: route.status === "draft" ? "planned" : route.status }, include: routeInclude });
+  const nextStatus = route.status === "draft" ? "planned" : route.status;
+  if (!canTransitionRoute(route.status, nextStatus)) return res.status(400).json({ message: "La ruta no se puede optimizar en su estado actual" });
+  const updated = await prisma.route.update({ where: { id: route.id }, data: { status: nextStatus }, include: routeInclude });
+  if (nextStatus === "planned") await prisma.delivery.updateMany({ where: { routeId: route.id, status: "pending" }, data: { status: "planned" } });
   await logAudit({ action: "route_optimized", userId: req.user.sub, entity: "route", entityId: route.id });
-  res.json(toRoute(updated));
+  const routeWithUpdatedStops = nextStatus === "planned" ? await prisma.route.findUnique({ where: { id: route.id }, include: routeInclude }) : updated;
+  res.json(toRoute(routeWithUpdatedStops));
 };

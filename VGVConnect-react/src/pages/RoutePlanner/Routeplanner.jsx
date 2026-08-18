@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import RouteList from "../../components/deliveries/RouteList";
 import MapView from "../../components/maps/Mapview";
 import { createRoute, deleteRoute, getRoutes, optimizeRoute, updateRoute } from "../../api/routes.api";
+import { deliveryStatusOptions, getAllowedDeliveryStatuses } from "../../utils/deliveryStatus";
 
 const initialForm = {
   date: new Date().toISOString().slice(0, 10),
@@ -32,14 +33,12 @@ const routeStatusOptions = [
   { value: "completed", label: "Completado" },
 ];
 
-const deliveryStatusOptions = [
-  { value: "pending", label: "Pendiente" },
-  { value: "planned", label: "Planificado" },
-  { value: "in_progress", label: "En progreso" },
-  { value: "completed", label: "Completado" },
-  { value: "rejected", label: "Rechazado" },
-  { value: "not_found", label: "No encontrado" },
-];
+const routeTransitions = {
+  draft: ["draft", "planned"],
+  planned: ["planned", "in_progress"],
+  in_progress: ["in_progress", "completed"],
+  completed: ["completed"],
+};
 
 const formatRouteStatusLabel = (status) => ({
   draft: "Borrador",
@@ -51,6 +50,7 @@ const formatRouteStatusLabel = (status) => ({
 
 export default function Routeplanner() {
   const [routes, setRoutes] = useState([]);
+  const [availableStops, setAvailableStops] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [selectedRoute, setSelectedRoute] = useState(null);
@@ -60,8 +60,10 @@ export default function Routeplanner() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [routeSearch, setRouteSearch] = useState("");
-  const [routeDateFilter, setRouteDateFilter] = useState("");
-  const [expandedSections, setExpandedSections] = useState({ routes: true, form: true, stops: true });
+  const [routeFromDate, setRouteFromDate] = useState("");
+  const [routeToDate, setRouteToDate] = useState("");
+  const [unassignedSearch, setUnassignedSearch] = useState("");
+  const [expandedSections, setExpandedSections] = useState({ routes: true, unassigned: true, form: true, stops: true });
   const deferredRouteSearch = useDeferredValue(routeSearch.trim().toLowerCase());
 
   const toggleSection = (section) => {
@@ -76,6 +78,7 @@ export default function Routeplanner() {
     try {
       const { data } = await getRoutes();
       setRoutes(data.routes);
+      setAvailableStops(data.availableStops || []);
       setDrivers(data.drivers);
       setVehicles(data.vehicles);
       setSelectedRoute((current) => data.routes.find((route) => route.id === current?.id) || data.routes[0] || null);
@@ -93,11 +96,13 @@ export default function Routeplanner() {
   }, []);
 
   const coordinates = selectedRoute?.coordinates || [];
+  const filteredUnassignedStops = useMemo(() => availableStops.filter((stop) => [stop.guideNumber, stop.clientName, stop.address].filter(Boolean).join(" ").toLowerCase().includes(unassignedSearch.trim().toLowerCase())), [availableStops, unassignedSearch]);
   const filteredRoutes = useMemo(() => routes.filter((route) => {
     const searchable = [route.documentNumber, route.driverName, route.destination, ...(route.stops || []).map((stop) => stop.guideNumber)].filter(Boolean).join(" ").toLowerCase();
-    const matchesDate = !routeDateFilter || route.date === routeDateFilter || route.deliveryDate === routeDateFilter;
+    const routeDates = [route.date, route.deliveryDate].filter(Boolean);
+    const matchesDate = (!routeFromDate || routeDates.some((date) => date >= routeFromDate)) && (!routeToDate || routeDates.some((date) => date <= routeToDate));
     return matchesDate && (!deferredRouteSearch || searchable.includes(deferredRouteSearch));
-  }), [routes, routeDateFilter, deferredRouteSearch]);
+  }), [routes, routeFromDate, routeToDate, deferredRouteSearch]);
   const selectedStops = useMemo(() => selectedRoute?.stops || [], [selectedRoute]);
   const groupedStops = useMemo(() => {
     const groups = new Map();
@@ -148,6 +153,18 @@ export default function Routeplanner() {
       ...current,
       stops: [...(current.stops || []), { id: null, client: "Punto de descarga", address: "", guideNumber: "", status: "pending" }],
     }));
+  };
+
+  const handleAssignAvailableStop = (stop) => {
+    if (!editingId) {
+      setError("Primero crea la ruta y luego podrás asignar entregas existentes.");
+      return;
+    }
+    setForm((current) => ({
+      ...current,
+      stops: [...(current.stops || []), { id: stop.id, client: stop.clientName, address: stop.address, guideNumber: stop.guideNumber || "", status: stop.status || "pending" }],
+    }));
+    setAvailableStops((current) => current.filter((item) => item.id !== stop.id));
   };
 
   const handleUpdateStop = (index, field, value) => {
@@ -296,8 +313,9 @@ export default function Routeplanner() {
 
       <div className="route-filter-bar">
         <label className="route-filter-search">Buscar ruta, chofer o guía<input value={routeSearch} onChange={(event) => setRouteSearch(event.target.value)} placeholder="Ej. Ruta 18-08, Camila o GD-0001" /></label>
-        <label>Fecha de ruta<input type="date" value={routeDateFilter} onClick={(event) => event.currentTarget.showPicker?.()} onChange={(event) => setRouteDateFilter(event.target.value)} /></label>
-        {(routeSearch || routeDateFilter) && <button className="secondary-action small" onClick={() => { setRouteSearch(""); setRouteDateFilter(""); }} type="button">Limpiar</button>}
+        <label>Desde<input type="date" value={routeFromDate} onClick={(event) => event.currentTarget.showPicker?.()} onChange={(event) => setRouteFromDate(event.target.value)} /></label>
+        <label>Hasta<input type="date" value={routeToDate} onClick={(event) => event.currentTarget.showPicker?.()} onChange={(event) => setRouteToDate(event.target.value)} /></label>
+        {(routeSearch || routeFromDate || routeToDate) && <button className="secondary-action small" onClick={() => { setRouteSearch(""); setRouteFromDate(""); setRouteToDate(""); }} type="button">Limpiar</button>}
       </div>
 
       <div className="route-planner-grid">
@@ -311,6 +329,17 @@ export default function Routeplanner() {
             <span className="accordion-icon">{expandedSections.routes ? "−" : "+"}</span>
           </button>
           {expandedSections.routes && (loading ? <p>Cargando rutas...</p> : <RouteList routes={filteredRoutes} selectedId={selectedRoute?.id} onSelect={selectRoute} />)}
+
+          <button type="button" className="panel-heading accordion-trigger route-unassigned-heading" aria-expanded={expandedSections.unassigned} onClick={() => toggleSection("unassigned")}>
+            <div><p className="eyebrow">Sin asignar</p><h3>Entregas disponibles</h3></div>
+            <span className="accordion-badge">{availableStops.length}</span>
+            <span className="accordion-icon">{expandedSections.unassigned ? "−" : "+"}</span>
+          </button>
+          {expandedSections.unassigned && <div className="route-unassigned-list">
+            <label>Buscar entrega<input value={unassignedSearch} onChange={(event) => setUnassignedSearch(event.target.value)} placeholder="Guía, cliente o dirección" /></label>
+            {!editingId && <p className="route-field-help">Selecciona una ruta existente para asignar entregas disponibles.</p>}
+            {filteredUnassignedStops.length ? filteredUnassignedStops.map((stop) => <article key={stop.id}><div><strong>{stop.guideNumber || "Sin guía"}</strong><small>{stop.clientName || "Cliente sin nombre"}</small><small>{stop.address}</small></div><button className="secondary-action small" disabled={!editingId} onClick={() => handleAssignAvailableStop(stop)} type="button">Asignar</button></article>) : <p className="route-field-help">No hay entregas sin asignar.</p>}
+          </div>}
         </aside>
 
         <div className="route-planner-workspace">
@@ -364,7 +393,7 @@ export default function Routeplanner() {
                               <label>Dirección<input value={stop.address} onChange={(event) => handleUpdateStop(index, "address", event.target.value)} placeholder="Dirección completa" /></label>
                               <div className="route-stop-editor-actions">
                                 <select value={stop.status || "pending"} onChange={(event) => handleUpdateStop(index, "status", event.target.value)}>
-                                  {deliveryStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                  {deliveryStatusOptions.filter((option) => stop.id == null ? option.value === "pending" : getAllowedDeliveryStatuses(stop.status).includes(option.value)).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                 </select>
                                 <button className="danger-action small" onClick={() => handleRemoveStop(index)} type="button">Quitar</button>
                               </div>
@@ -386,7 +415,7 @@ export default function Routeplanner() {
 
           <div className="route-detail-panel">
             {selectedRoute ? <>
-              <div className="panel-heading"><div><p className="eyebrow">Ruta seleccionada</p><h3>{selectedRoute.documentNumber || `Ruta #${selectedRoute.id}`}</h3><small>{selectedRoute.vehicleName} · {selectedRoute.driverName} · {selectedRoute.date} {selectedRoute.startTime}</small><small>{selectedRoute.origin} → {selectedRoute.destination}</small></div><div className="route-detail-actions"><select value={selectedRoute.status} onChange={(event) => handleStatus(event.target.value)}>{routeStatusOptions.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select><button className="danger-action" onClick={handleDelete} type="button">Eliminar</button></div></div>
+              <div className="panel-heading"><div><p className="eyebrow">Ruta seleccionada</p><h3>{selectedRoute.documentNumber || `Ruta #${selectedRoute.id}`}</h3><small>{selectedRoute.vehicleName} · {selectedRoute.driverName} · {selectedRoute.date} {selectedRoute.startTime}</small><small>{selectedRoute.origin} → {selectedRoute.destination}</small></div><div className="route-detail-actions"><select value={selectedRoute.status} onChange={(event) => handleStatus(event.target.value)}>{routeStatusOptions.filter((status) => routeTransitions[selectedRoute.status]?.includes(status.value)).map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select><button className="danger-action" onClick={handleDelete} type="button">Eliminar</button></div></div>
               <MapView coordinates={coordinates} />
               <div className="route-stops">
                 <h4>Puntos de descarga</h4>

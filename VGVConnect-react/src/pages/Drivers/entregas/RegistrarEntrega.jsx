@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { registrarEntregaDriver, uploadDeliveryPhotoDriver } from "../../../api/drivers.api";
+import { getDriverDeliveries, registrarEntregaDriver, uploadDeliveryPhotoDriver } from "../../../api/drivers.api";
 import useAuth from "../../../hooks/useAuth";
+import { deliveryStatusOptions, getAllowedDeliveryStatuses, normalizeDeliveryStatus } from "../../../utils/deliveryStatus";
 
 export default function RegistrarEntrega() {
   const { id } = useParams();
@@ -12,6 +13,7 @@ export default function RegistrarEntrega() {
   const [photoUrl, setPhotoUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [currentStatus, setCurrentStatus] = useState("pending");
   const [cameraOpen, setCameraOpen] = useState(false);
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
@@ -27,6 +29,18 @@ export default function RegistrarEntrega() {
   useEffect(() => () => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
   }, []);
+
+  useEffect(() => {
+    getDriverDeliveries(user.id)
+      .then(({ data }) => {
+        const delivery = data.find((item) => Number(item.id) === Number(id));
+        if (!delivery) return;
+        const nextStatus = normalizeDeliveryStatus(delivery.status || delivery.estado);
+        setCurrentStatus(nextStatus);
+        setStatus(nextStatus);
+      })
+      .catch(() => setError("No se pudo cargar el estado actual de la entrega."));
+  }, [id, user.id]);
 
   const handlePhoto = (event) => {
     const file = event.target.files?.[0];
@@ -94,9 +108,6 @@ export default function RegistrarEntrega() {
         reject,
         { enableHighAccuracy: true, timeout: 10000 },
       ));
-      if (status === "completed") {
-        await registrarEntregaDriver(id, { status: "in_progress", driverId: user.id });
-      }
       const { data } = await uploadDeliveryPhotoDriver(id, photoUrl);
       await registrarEntregaDriver(id, { status, photoUrl: data.url, location, observations, driverId: user.id, timestamp: new Date().toISOString() });
       navigate("/chofer");
@@ -119,12 +130,7 @@ export default function RegistrarEntrega() {
         <label>
           Resultado
           <select value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="pending">Pendiente</option>
-            <option value="planned">Planificado</option>
-            <option value="in_progress">En progreso</option>
-            <option value="completed">Completado</option>
-            <option value="rejected">Rechazado</option>
-            <option value="not_found">No encontrado</option>
+            {deliveryStatusOptions.filter((option) => getAllowedDeliveryStatuses(currentStatus).includes(option.value)).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
 
