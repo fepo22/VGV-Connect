@@ -159,6 +159,7 @@ export const updateRoute = async (req, res) => {
     const assignableIds = new Set(assignableStops.map((stop) => stop.id));
     const toAssign = stopChanges.toUpdate.filter((stop) => !stopChanges.currentMap.has(stop.id) && assignableIds.has(stop.id));
     const toUpdate = stopChanges.toUpdate.filter((stop) => stopChanges.currentMap.has(stop.id));
+    if (toAssign.length && !["draft", "planned"].includes(route.status)) return res.status(400).json({ message: "Solo se pueden asociar entregas a rutas en borrador o planificadas" });
     const invalidStop = toUpdate.find((stop) => !canTransitionDelivery(stopChanges.currentMap.get(stop.id)?.status, stop.status));
     if (invalidStop) return res.status(400).json({ message: `Transición de entrega no permitida: ${stopChanges.currentMap.get(invalidStop.id)?.status} a ${invalidStop.status}` });
     const unknownStops = stopChanges.toUpdate.filter((stop) => !stopChanges.currentMap.has(stop.id) && !assignableIds.has(stop.id));
@@ -194,6 +195,7 @@ export const updateRoute = async (req, res) => {
             clientName: stop.client,
             address: stop.address,
             guideNumber: stop.guideNumber,
+            status: route.status === "planned" ? "planned" : "pending",
           },
         });
       }

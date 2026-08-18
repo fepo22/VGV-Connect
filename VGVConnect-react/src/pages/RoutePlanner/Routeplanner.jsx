@@ -155,16 +155,43 @@ export default function Routeplanner() {
     }));
   };
 
-  const handleAssignAvailableStop = (stop) => {
-    if (!editingId) {
-      setError("Primero crea la ruta y luego podrás asignar entregas existentes.");
+  const buildRoutePayload = (nextStops = form.stops) => ({
+    ...form,
+    driverId: form.driverId || null,
+    vehicleId: form.vehicleId || null,
+    startTime: form.startTime,
+    stops: (nextStops || []).map((stop) => ({
+      id: stop.id ?? null,
+      client: (stop.client || "Punto de descarga").trim(),
+      address: (stop.address || "").trim(),
+      guideNumber: (stop.guideNumber || "").trim(),
+      status: stop.status || "pending",
+    })),
+  });
+
+  const handleAssignAvailableStop = async (stop) => {
+    if (!editingId || !selectedRoute) {
+      setError("Selecciona una ruta existente antes de asociar una entrega.");
       return;
     }
-    setForm((current) => ({
-      ...current,
-      stops: [...(current.stops || []), { id: stop.id, client: stop.clientName, address: stop.address, guideNumber: stop.guideNumber || "", status: stop.status || "pending" }],
-    }));
-    setAvailableStops((current) => current.filter((item) => item.id !== stop.id));
+    if (!["draft", "planned"].includes(selectedRoute.status)) {
+      setError("Solo puedes asociar entregas a rutas en borrador o planificadas.");
+      return;
+    }
+
+    const nextStop = { id: stop.id, client: stop.clientName, address: stop.address, guideNumber: stop.guideNumber || "", status: selectedRoute.status === "planned" ? "planned" : "pending" };
+    const nextStops = [...(form.stops || []), nextStop];
+    setSaving(true);
+    setError("");
+    try {
+      await updateRoute(editingId, buildRoutePayload(nextStops));
+      setForm((current) => ({ ...current, stops: nextStops }));
+      await loadRoutes();
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "No se pudo asociar la entrega a la ruta.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleUpdateStop = (index, field, value) => {
@@ -192,19 +219,7 @@ export default function Routeplanner() {
     setSaving(true);
     setError("");
     try {
-      const nextPayload = {
-        ...form,
-        driverId: form.driverId || null,
-        vehicleId: form.vehicleId || null,
-        startTime: form.startTime,
-        stops: (form.stops || []).map((stop) => ({
-          id: stop.id ?? null,
-          client: (stop.client || "Punto de descarga").trim(),
-          address: (stop.address || "").trim(),
-          guideNumber: (stop.guideNumber || "").trim(),
-          status: stop.status || "pending",
-        })),
-      };
+      const nextPayload = buildRoutePayload();
       if (editingId) await updateRoute(editingId, nextPayload);
       else await createRoute(nextPayload);
       setForm(initialForm);
@@ -338,7 +353,7 @@ export default function Routeplanner() {
           {expandedSections.unassigned && <div className="route-unassigned-list">
             <label>Buscar entrega<input value={unassignedSearch} onChange={(event) => setUnassignedSearch(event.target.value)} placeholder="Guía, cliente o dirección" /></label>
             {!editingId && <p className="route-field-help">Selecciona una ruta existente para asignar entregas disponibles.</p>}
-            {filteredUnassignedStops.length ? filteredUnassignedStops.map((stop) => <article key={stop.id}><div><strong>{stop.guideNumber || "Sin guía"}</strong><small>{stop.clientName || "Cliente sin nombre"}</small><small>{stop.address}</small></div><button className="secondary-action small" disabled={!editingId} onClick={() => handleAssignAvailableStop(stop)} type="button">Asignar</button></article>) : <p className="route-field-help">No hay entregas sin asignar.</p>}
+            {filteredUnassignedStops.length ? filteredUnassignedStops.map((stop) => <article key={stop.id}><div><strong>{stop.guideNumber || "Sin guía"}</strong><small>{stop.clientName || "Cliente sin nombre"}</small><small>{stop.address}</small></div><button className="secondary-action small" disabled={!editingId || saving || !["draft", "planned"].includes(selectedRoute?.status)} onClick={() => handleAssignAvailableStop(stop)} type="button">{saving ? "Asignando..." : "Asignar"}</button></article>) : <p className="route-field-help">No hay entregas sin asignar.</p>}
           </div>}
         </aside>
 

@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const http = axios.create({
-  baseURL: "http://localhost:4000", // luego lo cambiamos a producción
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:4000",
 });
 
 http.interceptors.request.use((config) => {

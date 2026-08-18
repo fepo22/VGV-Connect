@@ -117,6 +117,11 @@ Objetivo: soportar operación en terreno sin depender del navegador de escritori
 5. Desplegar frontend contra staging y ejecutar una prueba de aceptación completa: login, creación de ruta, asignación, entrega con foto/GPS, reporte y exportación.
 6. Hacer una prueba piloto con choferes reales antes de habilitar producción general.
 
+### Demo Railway
+
+- [x] Configuración monorepo para Railway: backend con healthcheck, migraciones y CORS configurable; frontend con URL de API por variable de entorno.
+- [ ] Crear servicios Railway, asignar PostgreSQL y variables de entorno, y ejecutar la prueba de aceptación en la URL pública.
+
 ### Criterio de salida a producción
 
 - [ ] CI en verde para backend y frontend.
