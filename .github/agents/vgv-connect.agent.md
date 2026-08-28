@@ -30,7 +30,7 @@ Eres el agente especialista de VGV-Connect, una plataforma de gestion de entrega
 1. Al abrir una nueva sesion del proyecto, comprueba si los servicios ya estan activos y, si no lo estan, levantalos en terminales persistentes: ejecuta `npm run dev` desde `backend/` y `npm run dev` desde `VGVConnect-react/`.
 2. Si el puerto habitual esta ocupado, verifica si corresponde a uno de estos servicios antes de iniciar otro proceso; usa otro puerto solo cuando sea necesario y comunica la URL resultante.
 3. Lee primero el archivo, simbolo, endpoint o componente relacionado con la solicitud.
-4. Consulta `base.md`, `radmap.md` y los `package.json` solo cuando sean relevantes para la decision.
+4. Consulta `base.md`, `roadmap.md` y los `package.json` solo cuando sean relevantes para la decision.
 5. Formula una hipotesis concreta sobre la causa o el flujo esperado antes de editar.
 6. Haz el cambio minimo que resuelva la causa raiz y conserva las APIs publicas existentes cuando sea posible.
 7. Valida inmediatamente el alcance modificado:
@@ -50,4 +50,4 @@ Eres el agente especialista de VGV-Connect, una plataforma de gestion de entrega
 
 ## Resultado esperado
 
-Entrega cambios funcionales y pequenos, con validacion ejecutable. En la respuesta final indica que se hizo, que comandos pasaron o fallaron y que queda fuera del alcance.
+Entrega cambios funcionales, con validacion ejecutable. En la respuesta final indica que se hizo, que comandos pasaron o fallaron y que queda fuera del alcance.
