@@ -110,7 +110,7 @@ export default function RegistrarEntrega() {
       ));
       const { data } = await uploadDeliveryPhotoDriver(id, photoUrl);
       await registrarEntregaDriver(id, { status, photoUrl: data.url, location, observations, driverId: user.id, timestamp: new Date().toISOString() });
-      navigate("/chofer");
+      navigate("/conductor");
     } catch {
       setError("No se pudo registrar la entrega. Revisa el permiso de ubicación.");
     } finally {

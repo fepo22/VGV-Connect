@@ -31,6 +31,14 @@
   font: 700 24px "Space Grotesk", sans-serif;
 }
 
+.login-logo {
+  width: 180px;
+  height: 102px;
+  margin-bottom: 18px;
+  border-radius: 14px;
+  object-fit: contain;
+}
+
 .login-card h1 {
   color: var(--ink);
   font: 700 26px "Space Grotesk", sans-serif;

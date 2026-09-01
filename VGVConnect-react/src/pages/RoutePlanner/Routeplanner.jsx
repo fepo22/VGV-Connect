@@ -155,7 +155,15 @@ export default function Routeplanner({ routeType = "delivery" }) {
   ].map((summary) => ({
     ...summary,
     active: summary.routes.filter((route) => ["draft", "planned", "in_progress"].includes(route.status)).length,
+    draft: summary.routes.filter((route) => route.status === "draft").length,
+    planned: summary.routes.filter((route) => route.status === "planned").length,
+    inProgress: summary.routes.filter((route) => route.status === "in_progress").length,
+    completed: summary.routes.filter((route) => route.status === "completed").length,
+    drivers: new Set(summary.routes.map((route) => route.driverName).filter((driver) => driver && driver !== "Sin asignar")).size,
+    weightKg: summary.routes.reduce((sum, route) => sum + Number(route.weightKg || 0), 0),
+    volumeM3: summary.routes.reduce((sum, route) => sum + Number(route.volumeM3 || 0), 0),
     stops: summary.routes.reduce((sum, route) => sum + Number(route.stopCount || 0), 0),
+    nextRoute: [...summary.routes].filter((route) => ["draft", "planned", "in_progress"].includes(route.status)).sort((first, second) => `${first.date || ""}${first.startTime || ""}`.localeCompare(`${second.date || ""}${second.startTime || ""}`))[0],
     latest: summary.routes.slice(0, 3),
   })), [routes]);
   const selectedStops = useMemo(() => selectedRoute?.stops || [], [selectedRoute]);
@@ -386,9 +394,9 @@ export default function Routeplanner({ routeType = "delivery" }) {
           <h2>{mode.title}</h2>
           <p>{mode.description}</p>
         </div>
-        <button className="primary-action" onClick={handleOptimize} disabled={!selectedRoute || saving} type="button">
+        {routeType !== "all" && <button className="primary-action" onClick={handleOptimize} disabled={!selectedRoute || saving} type="button">
           Optimizar ruta
-        </button>
+        </button>}
       </div>
 
       {error && <p className="route-error" role="alert">{error}</p>}
@@ -409,6 +417,18 @@ export default function Routeplanner({ routeType = "delivery" }) {
                     <span><strong>{summary.active}</strong> activas</span>
                     <span><strong>{summary.stops}</strong> puntos</span>
                   </div>
+                  <div className="route-quick-details">
+                    <div><small>Borrador</small><strong>{summary.draft}</strong></div>
+                    <div><small>Planificadas</small><strong>{summary.planned}</strong></div>
+                    <div><small>En ruta</small><strong>{summary.inProgress}</strong></div>
+                    <div><small>Completadas</small><strong>{summary.completed}</strong></div>
+                    <div><small>Conductores</small><strong>{summary.drivers}</strong></div>
+                    <div><small>Carga</small><strong>{summary.weightKg.toFixed(0)} kg · {summary.volumeM3.toFixed(1)} m3</strong></div>
+                  </div>
+                  <div className="route-quick-next">
+                    <small>Próxima ruta activa</small>
+                    {summary.nextRoute ? <strong>{summary.nextRoute.documentNumber || `Ruta #${summary.nextRoute.id}`} · {summary.nextRoute.driverName} · {summary.nextRoute.date} {summary.nextRoute.startTime}</strong> : <strong>Sin rutas activas</strong>}
+                  </div>
                   <div className="route-quick-list">
                     {summary.latest.length ? summary.latest.map((route) => (
                       <button key={route.id} onClick={() => selectRoute(route)} type="button">
@@ -424,6 +444,8 @@ export default function Routeplanner({ routeType = "delivery" }) {
           ))}
         </div>
       )}
+
+      {routeType === "all" ? null : <>
 
       <div className="route-filter-bar">
         <label className="route-filter-search">Buscar ruta, conductor o documento<input value={routeSearch} onChange={(event) => setRouteSearch(event.target.value)} placeholder="Ej. Ruta 18-08, Camila o GD-0001" /></label>
@@ -554,6 +576,7 @@ export default function Routeplanner({ routeType = "delivery" }) {
           </div>
         </div>
       </div>
+      </>}
     </section>
   );
 }

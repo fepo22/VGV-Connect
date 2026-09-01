@@ -11,7 +11,7 @@ export default function Home() {
   return (
     <section className="home-page">
       <div className="home-hero">
-        <p className="eyebrow">VGV CONNECT / OPERACIONES</p>
+        <p className="eyebrow">VGV CONNECT TMS / OPERACIONES</p>
         <h2>Todo el movimiento, en un solo lugar.</h2>
         <p className="home-intro">
           Accede rápidamente a la información que mantiene tus entregas en marcha.

@@ -24,7 +24,7 @@ export default function LoginPage() {
       const user = await loginUser(identifier, password);
       login(user);
       const roleHome = {
-        driver: "/chofer",
+        driver: "/conductor",
         route_planner: "/rutas",
         billing: "/reportes",
         admin: "/dashboard",
@@ -51,8 +51,8 @@ export default function LoginPage() {
   return (
     <div className="login-screen">
       <form onSubmit={handleLogin} className="login-card">
-        <span className="brand-mark">V</span>
-        <h1>VGV Connect</h1>
+        <img className="login-logo" src="/logo-vgv.jpg" alt="Vgv Connect TMS" />
+        <h1>Vgv Connect TMS</h1>
         <p>Gestiona entregas y rutas desde un solo lugar.</p>
 
         {error && (

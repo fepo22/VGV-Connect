@@ -72,20 +72,23 @@ export default function DriverManagement() {
 
   return (
     <section className="driver-management">
-      <div className="panel-heading"><div><p className="eyebrow">Administración</p><h3>{editingId ? "Editar conductor" : "Nuevo conductor"}</h3></div></div>
+      <div className="panel-heading"><div><p className="eyebrow">Administración</p><h3>Mantención de conductores</h3></div><span>{drivers.length}</span></div>
       {error && <p className="route-error" role="alert">{error}</p>}
       {createdCredentials && (
-        <p className="route-success" role="status">
-          Conductor <strong>@{createdCredentials.username}</strong> creado. Contraseña provisoria: <strong>{createdCredentials.temporaryPassword}</strong> (pídele que la cambie al iniciar sesión).
-        </p>
+        <div className="driver-credential-card" role="status">
+          <div><small>Credencial provisoria</small><strong>@{createdCredentials.username}</strong></div>
+          <span>{createdCredentials.temporaryPassword}</span>
+          <p>Pídele al conductor que cambie esta clave al iniciar sesión.</p>
+        </div>
       )}
       <form className="driver-management-form" onSubmit={handleSubmit}>
+        <div className="driver-management-form-title"><p className="eyebrow">{editingId ? "Edición" : "Alta"}</p><h4>{editingId ? "Editar conductor" : "Nuevo conductor"}</h4></div>
         <label>Nombre<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
         <label>Usuario<input required value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} /></label>
         <label>Patente predeterminada<select value={form.defaultVehicleId} onChange={(event) => setForm({ ...form, defaultVehicleId: event.target.value })}><option value="">Sin patente predeterminada</option>{vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.licensePlate} · {vehicle.name}</option>)}</select></label>
         <div className="driver-management-actions"><button className="primary-action" disabled={saving} type="submit">{saving ? "Guardando..." : editingId ? "Guardar cambios" : "Crear conductor"}</button>{editingId && <button className="secondary-action" onClick={resetForm} type="button">Cancelar</button>}</div>
       </form>
-      <div className="driver-management-list">{drivers.map((driver) => <article key={driver.id}><div><strong>{driver.name}</strong><small>@{driver.username} · {driver.defaultVehicle ? `${driver.defaultVehicle.licensePlate} · ${driver.defaultVehicle.name}` : "Sin patente predeterminada"}</small></div><div><button className="secondary-action small" onClick={() => editDriver(driver)} type="button">Editar</button><button className="danger-action small" onClick={() => removeDriver(driver)} type="button">Eliminar</button></div></article>)}</div>
+      <div className="driver-management-list">{drivers.map((driver) => <article key={driver.id}><div className="driver-management-avatar">{driver.name.slice(0, 2).toUpperCase()}</div><div><strong>{driver.name}</strong><small>@{driver.username}</small><small>{driver.defaultVehicle ? `${driver.defaultVehicle.licensePlate} · ${driver.defaultVehicle.name}` : "Sin patente predeterminada"}</small></div><div><button className="secondary-action small" onClick={() => editDriver(driver)} type="button">Editar</button><button className="danger-action small" onClick={() => removeDriver(driver)} type="button">Eliminar</button></div></article>)}</div>
     </section>
   );
 }

@@ -7,13 +7,13 @@ export default function Sidebar() {
     admin: [["/dashboard", "⌂", "Dashboard"], ["/entregas", "▣", "Entregas"], { to: "/rutas", label: "Rutas", icon: "↗", children: [["/rutas/entregas", "Entregas"], ["/rutas/retiros", "Retiros"]] }, ["/choferes", "◉", "Conductores"], ["/reportes", "▤", "Reportes"]],
     route_planner: [["/dashboard", "⌂", "Dashboard"], { to: "/rutas", label: "Rutas", icon: "↗", children: [["/rutas/entregas", "Entregas"], ["/rutas/retiros", "Retiros"]] }, ["/choferes", "◉", "Conductores"], ["/entregas", "▣", "Entregas"]],
     billing: [["/dashboard", "⌂", "Dashboard"], ["/reportes", "▤", "Reportes"], ["/entregas", "▣", "Entregas"]],
-    driver: [["/chofer", "◉", "Mis entregas"]],
+    driver: [["/conductor", "◉", "Mis entregas"], ["/conductor/check-vehiculo", "✓", "Check vehículo"]],
   };
   const links = linksByRole[user?.role] || [];
 
   return (
     <aside className="sidebar">
-      <div className="brand-lockup"><span className="brand-mark">V</span><span><strong>VGV</strong><small>Connect</small></span></div>
+      <div className="brand-lockup"><img className="brand-logo" src="/logo-vgv.jpg" alt="Vgv Connect TMS" /><span><strong>Vgv Connect</strong><small>TMS</small></span></div>
       <p className="sidebar-label">{user?.role === "driver" ? "Terreno" : "Operación"}</p>
       <nav className="sidebar-nav" aria-label="Navegación principal">
         {links.map((item) => Array.isArray(item) ? (

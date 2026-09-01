@@ -11,6 +11,7 @@ const openApiDocument = {
     { name: "Rutas" },
     { name: "Entregas" },
     { name: "Choferes" },
+    { name: "Check vehículo" },
     { name: "Auditoría" },
   ],
   components: {
@@ -24,6 +25,8 @@ const openApiDocument = {
       Route: { allOf: [{ $ref: "#/components/schemas/RouteInput" }, { type: "object", properties: { id: { type: "integer" }, documentNumber: { type: "string", example: "Ruta 18-08-2026 / 001" }, driverName: { type: "string" }, vehicleName: { type: "string" }, stops: { type: "array", items: { $ref: "#/components/schemas/RouteStop" } } } }] },
       DeliveryStatusUpdate: { type: "object", required: ["status"], properties: { status: { type: "string", enum: ["pending", "planned", "in_progress", "completed", "rejected", "not_found"] }, photoUrl: { type: "string", nullable: true }, observations: { type: "string", nullable: true }, location: { type: "object", properties: { lat: { type: "number" }, lng: { type: "number" } } }, timestamp: { type: "string", format: "date-time" } } },
       Delivery: { type: "object", properties: { id: { type: "integer" }, routeId: { type: "integer", nullable: true }, guideNumber: { type: "string" }, client: { type: "string" }, address: { type: "string" }, status: { type: "string" }, photoUrl: { type: "string", nullable: true }, location: { type: "object", nullable: true }, observations: { type: "string", nullable: true } } },
+      VehicleCheckInput: { type: "object", required: ["vehicleId", "checkDate", "odometerPhoto", "items"], properties: { driverId: { type: "integer", description: "Solo admin; el conductor autenticado se usa automáticamente" }, vehicleId: { type: "integer" }, checkDate: { type: "string", format: "date" }, odometer: { type: "integer", minimum: 0 }, odometerPhoto: { type: "string", description: "Imagen del tablero codificada en Data URL" }, odometerPhotoUrl: { type: "string" }, items: { type: "object", additionalProperties: { type: "object", properties: { status: { type: "string", enum: ["pending", "ok", "attention"] }, observation: { type: "string" } } } }, observations: { type: "string", nullable: true } } },
+      VehicleCheck: { allOf: [{ $ref: "#/components/schemas/VehicleCheckInput" }, { type: "object", properties: { id: { type: "integer" }, driverId: { type: "integer" }, odometerPhotoUrl: { type: "string" }, status: { type: "string", enum: ["pending", "ok", "attention"] }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } } }] },
     },
   },
   paths: {
@@ -43,6 +46,10 @@ const openApiDocument = {
     "/deliveries/{id}/status": { put: { tags: ["Entregas"], security: [{ bearerAuth: [] }], summary: "Actualizar estado de una entrega", description: "Respeta las transiciones Pendiente/Planificado a En progreso y En progreso a resultado final.", parameters: [{ $ref: "#/components/parameters/DeliveryId" }], requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/DeliveryStatusUpdate" } } } }, responses: { 200: { description: "Entrega actualizada" }, 400: { description: "Transición no permitida" }, 403: { description: "Entrega no asignada" } } } },
     "/deliveries/{id}/photo": { post: { tags: ["Entregas"], security: [{ bearerAuth: [] }], summary: "Subir evidencia fotográfica", parameters: [{ $ref: "#/components/parameters/DeliveryId" }], requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["photoData"], properties: { photoData: { type: "string", description: "Imagen codificada en Data URL" } } } } } }, responses: { 200: { description: "URL de evidencia" } } } },
     "/drivers/overview": { get: { tags: ["Choferes"], security: [{ bearerAuth: [] }], summary: "Resumen de carga y operación por chofer", responses: { 200: { description: "Indicadores de choferes" }, 403: { description: "Solo administración o planificación" } } } },
+    "/vehicle-checks": {
+      get: { tags: ["Check vehículo"], security: [{ bearerAuth: [] }], summary: "Listar checks de vehículo", parameters: [{ in: "query", name: "driverId", schema: { type: "integer" } }, { in: "query", name: "vehicleId", schema: { type: "integer" } }, { in: "query", name: "date", schema: { type: "string", format: "date" } }], responses: { 200: { description: "Checks encontrados", content: { "application/json": { schema: { type: "object", properties: { checks: { type: "array", items: { $ref: "#/components/schemas/VehicleCheck" } } } } } } } } },
+      post: { tags: ["Check vehículo"], security: [{ bearerAuth: [] }], summary: "Crear o actualizar check preoperacional", requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/VehicleCheckInput" } } } }, responses: { 201: { description: "Check guardado", content: { "application/json": { schema: { type: "object", properties: { check: { $ref: "#/components/schemas/VehicleCheck" } } } } } }, 400: { description: "Datos inválidos" }, 403: { description: "Sin permiso" } } },
+    },
     "/audit": { get: { tags: ["Auditoría"], security: [{ bearerAuth: [] }], summary: "Listar auditoría", responses: { 200: { description: "Últimos 200 eventos" }, 403: { description: "Solo administración" } } } },
   },
 };

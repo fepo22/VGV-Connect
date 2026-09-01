@@ -17,7 +17,8 @@ flowchart LR
     Rutas[Planificador de rutas]
     Conductores[Conductores]
     Reportes[Reportes]
-    Chofer[Panel de conductor]
+    Conductor[Panel de conductor]
+    CheckVehiculo[Check vehículo]
   end
 
   Frontend --> FrontendModules
@@ -52,12 +53,12 @@ flowchart TD
   RoleHome -->|admin| AdminHome[/dashboard]
   RoleHome -->|route_planner| PlannerHome[/rutas]
   RoleHome -->|billing| BillingHome[/reportes]
-  RoleHome -->|driver| DriverHome[/chofer]
+  RoleHome -->|driver| DriverHome[/conductor]
 
   AdminHome --> AdminModules[Dashboard, entregas, rutas, conductores y reportes]
   PlannerHome --> PlannerModules[Dashboard, rutas, conductores y entregas]
   BillingHome --> BillingModules[Dashboard, reportes y entregas]
-  DriverHome --> DriverModules[Mis entregas y registro de entrega]
+  DriverHome --> DriverModules[Mis entregas, registro de entrega y check vehículo]
 ```
 
 ## Flujo operativo principal
@@ -143,8 +144,10 @@ erDiagram
   USER ||--o{ ROUTE : conduce
   USER ||--o{ DELIVERY : registra
   USER ||--o{ AUDIT_LOG : genera
+  USER ||--o{ VEHICLE_CHECK : realiza
   USER }o--|| VEHICLE : vehiculo_predeterminado
   VEHICLE ||--o{ ROUTE : asignado_a
+  VEHICLE ||--o{ VEHICLE_CHECK : revisado_en
   ROUTE ||--o{ DELIVERY : contiene
   DELIVERY ||--o{ DELIVERY_EVENT : registra
 
@@ -204,6 +207,20 @@ erDiagram
     string action
     json metadata
     datetime createdAt
+  }
+
+  VEHICLE_CHECK {
+    int id PK
+    int driverId FK
+    int vehicleId FK
+    datetime checkDate
+    int odometer
+    string odometerPhotoUrl
+    json items
+    string observations
+    string status
+    datetime createdAt
+    datetime updatedAt
   }
 
   AUDIT_LOG {

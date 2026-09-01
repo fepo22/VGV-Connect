@@ -6,6 +6,7 @@ import routesRoutes from "../routes/routes.routes.js";
 import authRoutes from "../routes/auth.routes.js";
 import auditRoutes from "../routes/audit.routes.js";
 import driversRoutes from "../routes/drivers.routes.js";
+import vehicleChecksRoutes from "../routes/vehicle-checks.routes.js";
 import openApiDocument from "../docs/openapi.js";
 
 const app = express();
@@ -29,5 +30,6 @@ app.use("/routes", routesRoutes);
 app.use("/auth", authRoutes);
 app.use("/audit", auditRoutes);
 app.use("/drivers", driversRoutes);
+app.use("/vehicle-checks", vehicleChecksRoutes);
 
 export default app;

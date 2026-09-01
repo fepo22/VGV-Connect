@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Vgv Connect TMS">
+  <rect width="512" height="512" rx="112" fill="#0d4b6e"/>
+  <path fill="#2fb957" d="M96 156c0-33 27-60 60-60h200c33 0 60 27 60 60v200c0 33-27 60-60 60H156c-33 0-60-27-60-60V156Z"/>
+  <path fill="#fff" d="M159 154h58l39 169 39-169h58l-63 204h-68L159 154Z"/>
+  <path fill="#d9f2ee" d="M376 126c22 0 40 18 40 40v48h-48v-48c0-4-3-8-8-8h-48v-32h64Z" opacity=".85"/>
+  <circle cx="370" cy="368" r="22" fill="#d9f2ee"/>
+</svg>
