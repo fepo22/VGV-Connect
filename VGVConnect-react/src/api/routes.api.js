@@ -1,7 +1,9 @@
 import http from "./http";
 
-export const getRoutes = (driverId) =>
-	http.get("/routes", { params: driverId ? { driverId } : undefined });
+export const getRoutes = (options) => {
+	const params = typeof options === "object" ? options : options ? { driverId: options } : undefined;
+	return http.get("/routes", { params });
+};
 
 export const createRoute = (payload) => http.post("/routes", payload);
 

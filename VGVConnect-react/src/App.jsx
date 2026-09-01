@@ -38,7 +38,9 @@ export default function App() {
           <Route path="/inicio" element={<Navigate to="/home" replace />} />
           <Route path="/dashboard" element={<RoleRoute roles={["admin", "route_planner", "billing"]}><Dashboard /></RoleRoute>} />
           <Route path="/entregas" element={<RoleRoute roles={["admin", "route_planner", "billing"]}><DeliveriesPage /></RoleRoute>} />
-          <Route path="/rutas" element={<RoleRoute roles={["admin", "route_planner"]}><RoutePlanner /></RoleRoute>} />
+          <Route path="/rutas" element={<RoleRoute roles={["admin", "route_planner"]}><RoutePlanner routeType="all" /></RoleRoute>} />
+          <Route path="/rutas/entregas" element={<RoleRoute roles={["admin", "route_planner"]}><RoutePlanner routeType="delivery" /></RoleRoute>} />
+          <Route path="/rutas/retiros" element={<RoleRoute roles={["admin", "route_planner"]}><RoutePlanner routeType="pickup" /></RoleRoute>} />
           <Route path="/routeplanner" element={<Navigate to="/rutas" replace />} />
           <Route path="/choferes" element={<RoleRoute roles={["admin", "route_planner"]}><DriversOverview /></RoleRoute>} />
           <Route path="/reportes" element={<RoleRoute roles={["admin", "billing"]}><Reportes /></RoleRoute>} />

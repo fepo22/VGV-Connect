@@ -21,6 +21,8 @@ const optionalDecimal = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 };
+const routeTypes = new Set(["delivery", "pickup"]);
+const normalizeRouteType = (value) => routeTypes.has(value) ? value : "delivery";
 
 export const normalizeRouteStopInput = (stop = {}, fallbackStatus = "pending") => {
   const id = stop.id == null || stop.id === "" ? null : Number(stop.id);
@@ -45,7 +47,12 @@ export const planRouteStopChanges = (currentStops = [], incomingStops = []) => {
 };
 
 export const getRoutes = async (req, res) => {
-  const where = req.user.role === "driver" ? { driverId: Number(req.user.sub) } : req.query.driverId ? { driverId: Number(req.query.driverId) } : undefined;
+  const routeType = req.query.type && routeTypes.has(req.query.type) ? req.query.type : undefined;
+  const documentTypeFilter = routeType === "delivery" ? { in: ["delivery", "route"] } : routeType;
+  const where = {
+    ...(req.user.role === "driver" ? { driverId: Number(req.user.sub) } : req.query.driverId ? { driverId: Number(req.query.driverId) } : {}),
+    ...(routeType ? { documentType: documentTypeFilter } : {}),
+  };
   const [routes, driverList, vehicleList, availableStops] = await Promise.all([
     prisma.route.findMany({ where, include: routeInclude, orderBy: { serviceDate: "desc" } }),
     drivers(), prisma.vehicle.findMany({ orderBy: { licensePlate: "asc" } }),
@@ -63,6 +70,7 @@ export const getRoute = async (req, res) => {
 
 export const createRoute = async (req, res) => {
   const { date, deliveryDate, startTime, origin, destination, driverId, vehicleId, weightKg: rawWeightKg, volumeM3: rawVolumeM3, stops } = req.body;
+  const documentType = normalizeRouteType(req.body.documentType);
   if (!date || !startTime || !destination || driverId == null || vehicleId == null) return res.status(400).json({ message: "Chofer, patente, fecha, hora y destino son obligatorios" });
   const weightKg = optionalDecimal(rawWeightKg);
   const volumeM3 = optionalDecimal(rawVolumeM3);
@@ -85,7 +93,7 @@ export const createRoute = async (req, res) => {
       destination,
       weightKg: weightKg ?? null,
       volumeM3: volumeM3 ?? null,
-      documentType: "route",
+      documentType,
       documentNumber: routeName,
       driverId: driver.id,
       vehicleId: vehicle.id,
@@ -119,6 +127,7 @@ export const updateRoute = async (req, res) => {
   if (!route) return res.status(404).json({ message: "Ruta no encontrada" });
 
   const { date, deliveryDate, startTime, origin, destination, documentType, documentNumber, status, driverId, vehicleId, weightKg: rawWeightKg, volumeM3: rawVolumeM3, stops } = req.body;
+  const nextDocumentType = documentType === undefined ? undefined : normalizeRouteType(documentType);
   if (status !== undefined && !canTransitionRoute(route.status, status)) return res.status(400).json({ message: `Transición de ruta no permitida: ${route.status} a ${status}` });
   if (status === "completed") {
     const unresolvedStops = await prisma.delivery.count({ where: { routeId: route.id, status: { notIn: ["completed", "rejected", "not_found"] } } });
@@ -137,7 +146,7 @@ export const updateRoute = async (req, res) => {
       destination,
       weightKg,
       volumeM3,
-      documentType,
+      documentType: nextDocumentType,
       documentNumber,
       status,
       driverId: driverId === undefined ? undefined : Number(driverId),

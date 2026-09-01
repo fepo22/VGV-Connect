@@ -5,21 +5,14 @@ import dotenv from "dotenv";
 dotenv.config();
 const prisma = new PrismaClient();
 
-const users = [
+const baseUsers = [
   ["admin", "Administrador", "admin", "admin123"],
   ["programador", "Programador", "route_planner", "programador123"],
   ["faturacion", "Yessica", "billing", "faturacion123"],
-  ["nalvarez", "Nicolas Alvarez", "driver", "nalvarez123"],
-  ["acampos", "Alejandro Campos", "driver", "acampos123"],
-  ["msolis", "Mauricio Solis", "driver", "msolis123"],
-  ["rtito", "Roberto Saavedra", "driver", "rtito123"],
-  ["lseal", "Luis Seal", "driver", "lseal123"],
-  ["ltorres", "Luis Torres", "driver", "ltorres123"],
-  ["Tsantos", "Tolentino Santos", "driver", "tsantos123"],
 ];
 
 async function main() {
-  for (const [username, name, role, password] of users) {
+  for (const [username, name, role, password] of baseUsers) {
     await prisma.user.upsert({
       where: { username },
       update: { name, role, passwordHash: await bcrypt.hash(password, 10) },
@@ -40,7 +33,7 @@ async function main() {
   // Generación de datos de prueba (rutas y entregas ficticias) deshabilitada.
   // Solo se siembran usuarios y vehículos; entregas/rutas se cargan con datos reales.
 
-  console.log("Seed creado: usuarios y vehículos (sin rutas/entregas de prueba)");
+  console.log("Seed creado: usuarios base y vehículos (sin conductores/rutas/entregas de prueba)");
 }
 
 main().finally(() => prisma.$disconnect());
