@@ -58,6 +58,7 @@ VGV Connect cuenta con frontend React/Vite, backend Node.js/Express y persistenc
   - Carga y operación
 - El check se guarda en backend con relación a conductor, vehículo y fecha.
 - El registro incluye estados por ítem, observaciones, odómetro y foto del tablero.
+- Las fotos se almacenan en Google Drive cuando el backend tiene configurados `GOOGLE_DRIVE_FOLDER_ID` y `GOOGLE_SERVICE_ACCOUNT_JSON`.
 - Cada creación o actualización queda registrada en auditoría.
 - El navegador conserva una copia local como respaldo operativo si falla la conexión.
 
@@ -91,8 +92,36 @@ Resultado: las validaciones pasaron correctamente en el estado revisado.
 | Alta | `JWT_SECRET` con fallback | Riesgo de tokens firmados con secreto conocido | Exigir secreto obligatorio en producción. |
 | Alta | Vulnerabilidades npm audit | Dependencias con alertas high | Ejecutar `npm audit fix` y probar regresión. |
 | Media | Service worker cachea GET same-origin | Podría cachear datos sensibles si API comparte origen | Excluir endpoints API del cache. |
-| Media | Fotos en base64 sin validación fuerte | Riesgo de payloads grandes o inválidos | Validar MIME, tamaño y almacenamiento externo. |
+| Media | Acceso a fotos en Drive | Los enlaces dependen de permisos de la carpeta/archivos en Google Drive | Definir política de uso compartido de evidencias. |
 | Media | Login sin rate limit | Exposición a fuerza bruta | Agregar rate limiting por IP/usuario. |
+
+## Despliegue Render y fotos
+
+Se agregó `render.yaml` para desplegar en Render con tres recursos:
+
+- Backend `vgv-connect-api`.
+- Frontend estático `vgv-connect-web`.
+- PostgreSQL `vgv-connect-db`.
+
+La guía operativa completa está en [despliegue-render.md](despliegue-render.md).
+
+Variables clave del backend en Render:
+
+| Variable | Uso |
+| --- | --- |
+| `DATABASE_URL` | Conexión PostgreSQL desde Render. |
+| `JWT_SECRET` | Firma de tokens. |
+| `ENABLE_DEMO_USERS=false` | Evita inicializar usuarios demo en producción. |
+| `CORS_ORIGINS` | URL pública del frontend Render. |
+| `GOOGLE_DRIVE_FOLDER_ID` | Carpeta de Google Drive donde se almacenan fotos de entregas y check vehículo. |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | JSON de cuenta de servicio con permisos sobre la carpeta de Drive. |
+| `MAX_PHOTO_BYTES` | Límite de tamaño por foto. Valor sugerido: `5242880`. |
+
+Variable clave del frontend:
+
+| Variable | Uso |
+| --- | --- |
+| `VITE_API_URL` | URL pública del backend Render. |
 
 ## Próximas mejoras recomendadas
 
