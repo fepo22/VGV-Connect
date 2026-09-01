@@ -1,0 +1,35 @@
+1
+00:00:00,000 --> 00:00:11,328
+Vgv Connect es un sistema de gestion de transporte: centraliza entregas, rutas, conductores y reportes en una sola plataforma.
+
+2
+00:00:12,154 --> 00:00:23,674
+El acceso es por roles: administrador, planificador de rutas, facturacion y conductor. Cada usuario ve solo las herramientas que necesita.
+
+3
+00:00:25,499 --> 00:00:37,067
+El Dashboard resume la operacion del dia: indicadores clave, graficos de desempeno y un mapa con la ubicacion de las entregas en tiempo real.
+
+4
+00:00:39,079 --> 00:00:49,351
+En el modulo de Entregas se listan todos los despachos, con filtros por estado, cliente y fecha, para hacer seguimiento a cada guia.
+
+5
+00:00:50,182 --> 00:01:00,334
+El modulo de Rutas agrupa toda la programacion: aqui se ve, en una sola pantalla, tanto las rutas de entrega como las de retiro.
+
+6
+00:01:00,967 --> 00:01:13,303
+Dentro de Rutas, el submodulo de Entregas permite crear recorridos de despacho a clientes, asignando conductor, vehiculo y ordenando los puntos de descarga.
+
+7
+00:01:13,965 --> 00:01:24,165
+El submodulo de Retiros funciona igual, pero para planificar el retiro de mercaderia o compras directamente en los proveedores.
+
+8
+00:01:24,886 --> 00:01:34,126
+El modulo de Conductores administra al equipo de choferes, su vehiculo asignado y su disponibilidad para nuevas rutas.
+
+9
+00:01:34,760 --> 00:01:44,864
+Finalmente, Reportes entrega metricas de facturacion y desempeno operativo, para evaluar la eficiencia del transporte en el tiempo.
