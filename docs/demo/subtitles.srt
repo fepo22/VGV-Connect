@@ -1,35 +1,51 @@
 1
-00:00:00,000 --> 00:00:11,328
-Vgv Connect es un sistema de gestion de transporte: centraliza entregas, rutas, conductores y reportes en una sola plataforma.
+00:00:00,000 --> 00:00:07,392
+Vgv Connect: gestion de entregas, rutas y conductores en un solo sistema.
 
 2
-00:00:12,154 --> 00:00:23,674
-El acceso es por roles: administrador, planificador de rutas, facturacion y conductor. Cada usuario ve solo las herramientas que necesita.
+00:00:08,125 --> 00:00:15,853
+Acceso por roles: administrador, planificador de rutas, facturacion y conductor.
 
 3
-00:00:25,499 --> 00:00:37,067
-El Dashboard resume la operacion del dia: indicadores clave, graficos de desempeno y un mapa con la ubicacion de las entregas en tiempo real.
+00:00:17,424 --> 00:00:23,616
+Dashboard: KPIs, graficos y mapa de entregas en tiempo real.
 
 4
-00:00:39,079 --> 00:00:49,351
-En el modulo de Entregas se listan todos los despachos, con filtros por estado, cliente y fecha, para hacer seguimiento a cada guia.
+00:00:24,721 --> 00:00:29,857
+Entregas: listado con filtros por estado, cliente y fecha.
 
 5
-00:00:50,182 --> 00:01:00,334
-El modulo de Rutas agrupa toda la programacion: aqui se ve, en una sola pantalla, tanto las rutas de entrega como las de retiro.
+00:00:30,461 --> 00:00:35,261
+Rutas: vista general de entregas y retiros programados.
 
 6
-00:01:00,967 --> 00:01:13,303
-Dentro de Rutas, el submodulo de Entregas permite crear recorridos de despacho a clientes, asignando conductor, vehiculo y ordenando los puntos de descarga.
+00:00:35,685 --> 00:00:40,605
+Submenu Entregas: arma recorridos de despacho a clientes.
 
 7
-00:01:13,965 --> 00:01:24,165
-El submodulo de Retiros funciona igual, pero para planificar el retiro de mercaderia o compras directamente en los proveedores.
+00:00:41,034 --> 00:00:46,650
+Submenu Retiros: planifica el retiro de mercaderia en proveedores.
 
 8
-00:01:24,886 --> 00:01:34,126
-El modulo de Conductores administra al equipo de choferes, su vehiculo asignado y su disponibilidad para nuevas rutas.
+00:00:47,107 --> 00:00:52,387
+Conductores: gestion de choferes, vehiculos y disponibilidad.
 
 9
-00:01:34,760 --> 00:01:44,864
-Finalmente, Reportes entrega metricas de facturacion y desempeno operativo, para evaluar la eficiencia del transporte en el tiempo.
+00:00:52,849 --> 00:00:57,745
+Reportes: metricas de facturacion y desempeno operativo.
+
+10
+00:00:58,185 --> 00:01:04,017
+Ahora el modulo de conductor: inicio de sesion con su propia cuenta.
+
+11
+00:01:05,455 --> 00:01:10,543
+Panel del conductor: ruta activa y entregas pendientes del dia.
+
+12
+00:01:11,455 --> 00:01:17,887
+Submenu Check vehiculo: checklist y foto del tablero antes de salir a ruta.
+
+13
+00:01:18,606 --> 00:01:26,166
+Submenu Registrar entrega: sube la foto del documento firmado y confirma el resultado.
