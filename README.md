@@ -52,15 +52,7 @@ El MVP usa usuarios temporales en memoria. El login se realiza con usuario y con
 | Usuario | Nombre | Rol | Contraseña | Módulo principal |
 | --- | --- | --- | --- | --- |
 | `admin` | Administrador | `admin` | `admin123` | Dashboard y administración |
-| `programador` | Programador | `route_planner` | `programador123` | Planificador de rutas |
-| `faturacion` | Yessica | `billing` | `faturacion123` | Reportes |
-| `nalvarez` | Nicolas Alvarez | `driver` | `nalvarez123` | Dashboard de chofer |
-| `acampos` | Alejandro Campos | `driver` | `acampos123` | Dashboard de chofer |
-| `msolis` | Mauricio Solis | `driver` | `msolis123` | Dashboard de chofer |
-| `rtito` | Roberto Saavedra | `driver` | `rtito123` | Dashboard de chofer |
-| `lseal` | Luis Seal | `driver` | `lseal123` | Dashboard de chofer |
-| `ltorres` | Luis Torres | `driver` | `ltorres123` | Dashboard de chofer |
-| `Tsantos` | Tolentino Santos | `driver` | `tsantos123` | Dashboard de chofer |
+
 
 ## Flujo principal
 
