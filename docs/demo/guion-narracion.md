@@ -65,7 +65,8 @@ Guion usado para generar la locución con voz IA (edge-tts, voz `es-CL-LorenzoNe
 ## Notas de producción
 
 - **Voz IA:** edge-tts con la voz chilena `es-CL-LorenzoNeural` (rate +8%) para un tono comercial, cercano y natural, más adecuado para una demo de venta que la voz robotizada anterior.
+- **Transiciones:** la navegación entre módulos se hace haciendo clic en el sidebar (como un usuario real), no recargando la página, para evitar el flash blanco de una recarga completa entre pantallas.
 - **Check vehicular:** en la escena 12 se marcan en vivo ítems de las 4 secciones del checklist (Documentación, Seguridad obligatoria, Condición del vehículo, Carga y operación) y se completa el odómetro, para mostrar realmente los elementos del control preoperacional.
 - **Subtítulos:** `docs/demo/subtitles.srt` contiene los 14 cortes con los tiempos exactos del video; se queman con fuente reducida (tamaño 10) para no tapar la interfaz.
 - **Datos del conductor demo:** usuario `chofer1` / contraseña `chofer1234`, con una ruta y una entrega de ejemplo (`R-DEMO-001` / guía `G-1001`) creadas solo para la grabación.
-- Si se necesita regenerar el video, el script de grabación está en `record5.mjs` (fuera del repo, en el entorno de trabajo).
+- Si se necesita regenerar el video, el script de grabación está en `record6.mjs` (fuera del repo, en el entorno de trabajo).

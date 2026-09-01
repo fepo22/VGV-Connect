@@ -3,53 +3,53 @@
 Vgv Connect es la plataforma pensada para transportistas que quieren dejar el papel y las planillas atrás: entregas, rutas y conductores, todo en un solo lugar, fácil de usar desde el primer día.
 
 2
-00:00:11,931 --> 00:00:20,763
+00:00:11,655 --> 00:00:20,487
 El acceso es simple y seguro: cada persona entra con su propio usuario y ve solo lo que necesita, ya sea administrador, planificador, facturación o conductor.
 
 3
-00:00:22,438 --> 00:00:31,558
+00:00:22,022 --> 00:00:31,142
 El Dashboard te da el control total de un vistazo: indicadores clave, gráficos de desempeño y un mapa en tiempo real, para tomar decisiones rápidas y con datos reales.
 
 4
-00:00:33,066 --> 00:00:40,746
+00:00:32,650 --> 00:00:40,330
 El módulo de Entregas te permite hacer seguimiento a cada despacho, con filtros por estado, cliente y fecha, para que ninguna entrega se te escape.
 
 5
-00:00:41,471 --> 00:00:49,223
+00:00:40,656 --> 00:00:48,408
 En Rutas organizas toda tu operación: entregas y retiros, planificados desde una sola pantalla, ahorrando tiempo y evitando errores.
 
 6
-00:00:49,763 --> 00:00:57,395
+00:00:48,747 --> 00:00:56,379
 El submenú Entregas te ayuda a armar el recorrido perfecto para cada despacho, asignando conductor, vehículo y puntos de descarga en minutos.
 
 7
-00:00:57,918 --> 00:01:05,310
+00:00:56,703 --> 00:01:04,095
 El submenú Retiros hace lo mismo para coordinar el retiro de mercadería o compras con tus proveedores, sin llamadas ni planillas paralelas.
 
 8
-00:01:05,817 --> 00:01:13,209
+00:01:04,438 --> 00:01:11,830
 El módulo Conductores te permite gestionar a tu equipo de choferes, sus vehículos asignados y su disponibilidad, todo desde un mismo panel.
 
 9
-00:01:13,718 --> 00:01:20,966
+00:01:12,148 --> 00:01:19,396
 Reportes te entrega la información que necesitas para decidir mejor: facturación, desempeño y cumplimiento, siempre actualizados.
 
 10
-00:01:21,408 --> 00:01:27,888
+00:01:19,717 --> 00:01:26,197
 Y en terreno, cada conductor tiene su propio acceso: simple, rápido y pensado para usarse desde el celular.
 
 11
-00:01:29,529 --> 00:01:35,457
+00:01:27,880 --> 00:01:33,808
 Su panel muestra la ruta activa y las entregas del día, para que sepa exactamente qué hacer sin perder tiempo.
 
 12
-00:01:36,365 --> 00:01:46,805
+00:01:34,717 --> 00:01:45,157
 Antes de salir a ruta, completa el check vehicular: documentación, seguridad obligatoria, condición mecánica y carga, con una foto del tablero como respaldo, para operar siempre seguro.
 
 13
-00:01:50,744 --> 00:01:58,472
+00:01:49,322 --> 00:01:57,050
 Al momento de entregar, el conductor sube la foto del documento firmado y confirma el resultado, dejando trazabilidad total de cada operación.
 
 14
-00:02:01,337 --> 00:02:08,105
+00:02:00,227 --> 00:02:06,995
 Vgv Connect: más control, más eficiencia y más tranquilidad, en cada entrega. Súmate hoy.
