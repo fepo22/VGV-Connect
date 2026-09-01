@@ -18,6 +18,14 @@ const parseDefaultVehicleId = async (value) => {
   return vehicle ? vehicle.id : undefined;
 };
 
+const isNameTakenByAnotherDriver = async (name, excludeId) => {
+  const existing = await prisma.user.findFirst({
+    where: { role: "driver", name: { equals: name, mode: "insensitive" }, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    select: { id: true },
+  });
+  return Boolean(existing);
+};
+
 export const getDrivers = async (_req, res) => {
   const [drivers, vehicles] = await Promise.all([
     prisma.user.findMany({
@@ -38,6 +46,7 @@ export const createDriver = async (req, res) => {
   const defaultVehicleId = await parseDefaultVehicleId(req.body.defaultVehicleId);
   if (!name || !username) return res.status(400).json({ message: "Nombre y usuario son obligatorios" });
   if (defaultVehicleId === undefined) return res.status(400).json({ message: "La patente predeterminada no es válida" });
+  if (await isNameTakenByAnotherDriver(name)) return res.status(409).json({ message: "Ya existe un conductor con ese nombre" });
 
   const temporaryPassword = generateTemporaryPassword();
 
@@ -63,6 +72,7 @@ export const updateDriver = async (req, res) => {
   if (req.body.name !== undefined) {
     const name = String(req.body.name).trim();
     if (!name) return res.status(400).json({ message: "El nombre es obligatorio" });
+    if (await isNameTakenByAnotherDriver(name, id)) return res.status(409).json({ message: "Ya existe un conductor con ese nombre" });
     data.name = name;
   }
   if (req.body.username !== undefined) {
