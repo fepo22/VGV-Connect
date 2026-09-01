@@ -47,7 +47,7 @@ export default function DashboardChofer() {
   return (
     <section className="driver-page">
       <div className="driver-hero">
-        <div><p className="eyebrow">Panel de chofer</p><h2>Hola, {user.name}</h2><p>Ejecuta tu ruta, registra cada entrega y mantén la trazabilidad al día.</p></div>
+        <div><p className="eyebrow">Panel de conductor</p><h2>Hola, {user.name}</h2><p>Ejecuta tu ruta, registra cada entrega y mantén la trazabilidad al día.</p></div>
         <span className="driver-role">driver</span>
       </div>
 

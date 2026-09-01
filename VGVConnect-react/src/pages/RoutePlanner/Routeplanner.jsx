@@ -155,6 +155,17 @@ export default function Routeplanner() {
     }));
   };
 
+  const handleDriverChange = (driverId) => {
+    setForm((current) => {
+      const driver = drivers.find((item) => item.id === Number(driverId));
+      return {
+        ...current,
+        driverId,
+        vehicleId: editingId ? current.vehicleId : driver?.defaultVehicleId ? String(driver.defaultVehicleId) : "",
+      };
+    });
+  };
+
   const buildRoutePayload = (nextStops = form.stops) => ({
     ...form,
     driverId: form.driverId || null,
@@ -317,7 +328,7 @@ export default function Routeplanner() {
         <div>
           <p className="eyebrow">Administración operativa</p>
           <h2>Planificador de rutas</h2>
-          <p>Crea recorridos, asigna choferes y organiza las cargas del camión antes de enviarlas a operación.</p>
+          <p>Crea recorridos, asigna conductores y organiza las cargas del camión antes de enviarlas a operación.</p>
         </div>
         <button className="primary-action" onClick={handleOptimize} disabled={!selectedRoute || saving} type="button">
           Optimizar ruta
@@ -327,7 +338,7 @@ export default function Routeplanner() {
       {error && <p className="route-error" role="alert">{error}</p>}
 
       <div className="route-filter-bar">
-        <label className="route-filter-search">Buscar ruta, chofer o guía<input value={routeSearch} onChange={(event) => setRouteSearch(event.target.value)} placeholder="Ej. Ruta 18-08, Camila o GD-0001" /></label>
+        <label className="route-filter-search">Buscar ruta, conductor o guía<input value={routeSearch} onChange={(event) => setRouteSearch(event.target.value)} placeholder="Ej. Ruta 18-08, Camila o GD-0001" /></label>
         <label>Desde<input type="date" value={routeFromDate} onClick={(event) => event.currentTarget.showPicker?.()} onChange={(event) => setRouteFromDate(event.target.value)} /></label>
         <label>Hasta<input type="date" value={routeToDate} onClick={(event) => event.currentTarget.showPicker?.()} onChange={(event) => setRouteToDate(event.target.value)} /></label>
         {(routeSearch || routeFromDate || routeToDate) && <button className="secondary-action small" onClick={() => { setRouteSearch(""); setRouteFromDate(""); setRouteToDate(""); }} type="button">Limpiar</button>}
@@ -371,7 +382,7 @@ export default function Routeplanner() {
                 <div className="route-form-fields">
                   <label>Fecha de planificación<input required type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></label>
                   <label>Fecha de entrega<input type="date" value={form.deliveryDate} onChange={(event) => setForm({ ...form, deliveryDate: event.target.value })} /></label>
-                  <label>Chofer<select required value={form.driverId} onChange={(event) => setForm({ ...form, driverId: event.target.value })}><option value="">Seleccionar chofer</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label>
+                  <label>Conductor<select required value={form.driverId} onChange={(event) => handleDriverChange(event.target.value)}><option value="">Seleccionar conductor</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label>
                   <label>Camión / patente<select required value={form.vehicleId} onChange={(event) => setForm({ ...form, vehicleId: event.target.value })}><option value="">Seleccionar patente</option>{vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.licensePlate} · {vehicle.name}</option>)}</select></label>
                 </div>
                 <div className="route-form-fields"><label>Origen<input required value={form.origin} onChange={(event) => setForm({ ...form, origin: event.target.value })} placeholder="Ej. Av. Presidente Kennedy 9000, Santiago" /><small className="route-field-help">Dirección de origen para la ruta.</small></label><label>Destino<input required value={form.destination} onChange={(event) => setForm({ ...form, destination: event.target.value })} placeholder="Ej. Av. Apoquindo 3000, Las Condes" /><small className="route-field-help">Destino de la ruta y optimización del recorrido.</small></label></div>
@@ -420,7 +431,7 @@ export default function Routeplanner() {
                   )}
                 </div>
 
-                <small className="route-field-help">Estos valores quedan abiertos en el flujo de planificación y se usan para la programación del chofer sin bloquear la operación por ahora.</small>
+                <small className="route-field-help">Estos valores quedan abiertos en el flujo de planificación y se usan para la programación del conductor sin bloquear la operación por ahora.</small>
                 <div className="route-detail-actions">
                   <button className="primary-action" disabled={saving} type="submit">{saving ? "Guardando..." : editingId ? "Guardar cambios" : "Crear ruta"}</button>
                 </div>

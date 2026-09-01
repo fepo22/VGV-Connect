@@ -49,7 +49,7 @@ export default function Dashboard() {
         <div className="workflow-grid">
           <Link to="/entregas" className="workflow-step"><b>01</b><span>Entregas</span><small>Actualiza estados, fotos y evidencias.</small></Link>
           <Link to="/rutas" className="workflow-step"><b>02</b><span>Rutas</span><small>Ordena recorridos y revisa paradas.</small></Link>
-          <Link to="/choferes" className="workflow-step"><b>03</b><span>Choferes</span><small>Consulta la operación en terreno.</small></Link>
+          <Link to="/choferes" className="workflow-step"><b>03</b><span>Conductores</span><small>Consulta la operación en terreno.</small></Link>
           <Link to="/reportes" className="workflow-step"><b>04</b><span>Reportes</span><small>Mide resultados y detecta atrasos.</small></Link>
         </div>
       </div>

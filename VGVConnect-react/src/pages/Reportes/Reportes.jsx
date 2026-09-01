@@ -29,7 +29,7 @@ export default function Reportes() {
     const evidenceCount = completedItems.filter((item) => item.photoUrl).length;
     const evidenceRate = completed ? Math.round((evidenceCount / completed) * 100) : 0;
     const drivers = Object.values(operationalDeliveries.reduce((groups, item) => {
-      const name = item.driverName || "Sin chofer asignado";
+      const name = item.driverName || "Sin conductor asignado";
       const current = groups[name] || { name, total: 0, completed: 0, active: 0, incidents: 0 };
       current.total += 1;
       current.completed += readStatus(item) === "completed" ? 1 : 0;
@@ -74,8 +74,8 @@ export default function Reportes() {
           {metrics.attentionItems.length ? <div className="report-attention-list">{metrics.attentionItems.map((item) => <article key={item.id}><div><strong>{item.guideNumber || "Sin guía"}</strong><small>{item.cliente || item.client || "Cliente sin nombre"} · {item.direccion || item.address || "Sin dirección"}</small></div><span>{readStatus(item) === "not_found" ? "No encontrada" : readStatus(item) === "rejected" ? "Rechazada" : "Pendiente"}</span></article>)}</div> : <p className="report-empty">No hay casos críticos pendientes de revisión.</p>}
         </section>
         <section className="report-panel">
-          <div className="report-panel-heading"><div><p className="eyebrow">Carga por chofer</p><h3>Distribución de la operación</h3></div></div>
-          {metrics.drivers.length ? <div className="report-driver-list">{metrics.drivers.map((driver) => <article key={driver.name}><div><strong>{driver.name}</strong><small>{driver.completed} completadas · {driver.active} en progreso · {driver.incidents} incidencias</small></div><b>{driver.total}</b></article>)}</div> : <p className="report-empty">No hay choferes asignados en este período.</p>}
+          <div className="report-panel-heading"><div><p className="eyebrow">Carga por conductor</p><h3>Distribución de la operación</h3></div></div>
+          {metrics.drivers.length ? <div className="report-driver-list">{metrics.drivers.map((driver) => <article key={driver.name}><div><strong>{driver.name}</strong><small>{driver.completed} completadas · {driver.active} en progreso · {driver.incidents} incidencias</small></div><b>{driver.total}</b></article>)}</div> : <p className="report-empty">No hay conductores asignados en este período.</p>}
         </section>
       </div>}
       <div className="report-next-step"><div><p className="eyebrow">Decisión recomendada</p><h3>{loading ? "Revisando la operación..." : metrics.incidents ? "Atiende primero las incidencias reportadas" : metrics.pending ? "Asigna seguimiento a las entregas pendientes" : "La operación no registra excepciones"}</h3><p>{loading ? "" : "Abre el listado para revisar evidencia, ubicación y responsable de cada caso."}</p></div><Link className="primary-action" to="/entregas">Abrir entregas</Link></div>

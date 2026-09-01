@@ -36,6 +36,8 @@ model User {
   name        String
   passwordHash String
   role        UserRole
+  defaultVehicleId Int?
+  defaultVehicle Vehicle? @relation("DefaultVehicle", fields: [defaultVehicleId], references: [id])
   routes      Route[]      @relation("DriverRoutes")
   auditLogs   AuditLog[]
   deliveries  Delivery[]   @relation("DriverDeliveries")
@@ -49,6 +51,7 @@ model Vehicle {
   licensePlate String   @unique
   maxWeightKg  Decimal? @db.Decimal(10, 2)
   maxVolumeM3  Decimal? @db.Decimal(10, 3)
+  defaultDrivers User[] @relation("DefaultVehicle")
   routes       Route[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

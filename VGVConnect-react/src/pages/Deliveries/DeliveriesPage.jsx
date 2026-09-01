@@ -40,7 +40,7 @@ export default function DeliveriesPage() {
   const evidence = useMemo(() => filteredDeliveries.filter((delivery) => delivery.photoUrl), [filteredDeliveries]);
 
   const exportCsv = () => {
-    const rows = [["Ruta", "Guía", "Cliente", "Dirección", "Comuna", "Chofer", "Estado", "Creada", "Actualizada", "Confirmada"]];
+    const rows = [["Ruta", "Guía", "Cliente", "Dirección", "Comuna", "Conductor", "Estado", "Creada", "Actualizada", "Confirmada"]];
     filteredDeliveries.forEach((delivery) => rows.push([delivery.route?.documentNumber || "", delivery.guideNumber || "", delivery.client || "", delivery.address || "", delivery.commune || "", delivery.driverName || "", normalizeDeliveryStatus(delivery.status), delivery.createdAt || "", delivery.updatedAt || "", delivery.deliveredAt || ""]));
     const csv = rows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
@@ -61,12 +61,12 @@ export default function DeliveriesPage() {
         <article><span>Con incidencia</span><strong>{loading ? "-" : metrics.issues}</strong></article>
       </div>
       <div className="delivery-toolbar">
-        <label className="delivery-search">Buscar entrega<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Guía, cliente, dirección o chofer" /></label>
+        <label className="delivery-search">Buscar entrega<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Guía, cliente, dirección o conductor" /></label>
         <label className="delivery-filter">Estado<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Todos los estados</option><option value="pending">Pendiente</option><option value="in_progress">En progreso</option><option value="completed">Completado</option><option value="rejected">Rechazado</option><option value="not_found">No encontrado</option></select></label>
         <label className="delivery-filter">Fecha<select value={dateField} onChange={(event) => setDateField(event.target.value)}><option value="createdAt">Creación</option><option value="updatedAt">Última modificación</option><option value="deliveredAt">Confirmación</option></select></label>
         <label className="delivery-filter">Desde<input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label>
         <label className="delivery-filter">Hasta<input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} /></label>
-        <label className="delivery-filter">Chofer<select value={driverFilter} onChange={(event) => setDriverFilter(event.target.value)}><option value="all">Todos</option>{filterOptions.drivers.map((driver) => <option key={driver} value={driver}>{driver}</option>)}</select></label>
+        <label className="delivery-filter">Conductor<select value={driverFilter} onChange={(event) => setDriverFilter(event.target.value)}><option value="all">Todos</option>{filterOptions.drivers.map((driver) => <option key={driver} value={driver}>{driver}</option>)}</select></label>
         <label className="delivery-filter">Cliente<select value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}><option value="all">Todos</option>{filterOptions.clients.map((client) => <option key={client} value={client}>{client}</option>)}</select></label>
         <label className="delivery-filter">Comuna<select value={communeFilter} onChange={(event) => setCommuneFilter(event.target.value)}><option value="all">Todas</option>{filterOptions.communes.map((commune) => <option key={commune} value={commune}>{commune}</option>)}</select></label>
         <div className="delivery-export-actions"><button className="secondary-action small" onClick={exportCsv} type="button">CSV para Excel</button><button className="secondary-action small" onClick={() => window.print()} type="button">Imprimir / PDF</button></div>

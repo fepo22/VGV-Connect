@@ -4,8 +4,8 @@ import useAuth from "../../hooks/useAuth";
 export default function Sidebar() {
   const { user } = useAuth();
   const linksByRole = {
-    admin: [["/dashboard", "⌂", "Dashboard"], ["/entregas", "▣", "Entregas"], ["/rutas", "↗", "Rutas"], ["/choferes", "◉", "Choferes"], ["/reportes", "▤", "Reportes"]],
-    route_planner: [["/dashboard", "⌂", "Dashboard"], ["/rutas", "↗", "Rutas"], ["/choferes", "◉", "Choferes"], ["/entregas", "▣", "Entregas"]],
+    admin: [["/dashboard", "⌂", "Dashboard"], ["/entregas", "▣", "Entregas"], ["/rutas", "↗", "Rutas"], ["/choferes", "◉", "Conductores"], ["/reportes", "▤", "Reportes"]],
+    route_planner: [["/dashboard", "⌂", "Dashboard"], ["/rutas", "↗", "Rutas"], ["/choferes", "◉", "Conductores"], ["/entregas", "▣", "Entregas"]],
     billing: [["/dashboard", "⌂", "Dashboard"], ["/reportes", "▤", "Reportes"], ["/entregas", "▣", "Entregas"]],
     driver: [["/chofer", "◉", "Mis entregas"]],
   };

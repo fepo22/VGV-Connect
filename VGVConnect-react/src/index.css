@@ -32,14 +32,16 @@
   }
 }
 :root {
-  --ink: #17252b;
-  --muted: #718087;
-  --paper: #f5f7f5;
+  /* Paleta corporativa VGV SPA */
+  --ink: #062845;
+  --muted: #5b6b78;
+  --paper: #f9f9f9;
   --surface: #ffffff;
-  --line: #dfe7e3;
-  --navy: #163b45;
-  --teal: #197c78;
-  --coral: #e4775d;
+  --line: #dcdcdc;
+  --navy: #0a3d62;
+  --teal: #1e90ff;
+  --coral: #28a745;
+  --alert: #d32f2f;
   font-family: "DM Sans", sans-serif;
   color: var(--ink);
   background: var(--paper);
@@ -193,6 +195,7 @@ h1, h2, h3 { font-family: "Space Grotesk", sans-serif; }
 .route-filter-bar input, .route-filter-bar select { min-height: 40px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #fff; font: inherit; text-transform: none; }
 .route-filter-search { min-width: 0; }
 .route-error { padding: 12px 14px; border: 1px solid #f1b6a5; border-radius: 10px; color: #9a3f2e; background: #fff3ef; }
+.route-success { padding: 12px 14px; border: 1px solid rgba(40,167,69,0.35); border-radius: 10px; color: #1e7a34; background: rgba(40,167,69,0.08); }
 .route-planner-grid { display: grid; grid-template-columns: minmax(270px, .75fr) minmax(0, 1.5fr); gap: 18px; align-items: start; }
 .route-planner-sidebar, .route-form, .route-detail-panel { padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .route-planner-sidebar, .route-workspace, .route-detail-panel { min-width: 0; }
@@ -378,6 +381,16 @@ h1, h2, h3 { font-family: "Space Grotesk", sans-serif; }
 .driver-overview-stats { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); font-size: 11px; }
 .driver-overview-stats b { color: var(--ink); font-size: 14px; }
 .driver-route-lines { display: grid; gap: 4px; color: var(--muted); font-size: 11px; }
+.driver-management { display: grid; gap: 16px; padding: 22px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.driver-management-form { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.driver-management-form label { display: grid; gap: 7px; color: var(--ink); font-size: 12px; font-weight: 700; }
+.driver-management-form input, .driver-management-form select { min-height: 42px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #fbfcfb; font: inherit; }
+.driver-management-actions { display: flex; grid-column: 1 / -1; gap: 10px; }
+.driver-management-list { display: grid; }
+.driver-management-list article { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); }
+.driver-management-list strong, .driver-management-list small { display: block; }
+.driver-management-list small { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.driver-management-list article > div:last-child { display: flex; gap: 8px; }
 
 /* El shell ocupa todo el viewport; no usa el contenedor centrado del starter de Vite. */
 #root { width: 100%; max-width: none; margin: 0; text-align: left; border: 0; display: block; }
@@ -407,6 +420,8 @@ h1, h2, h3 { font-family: "Space Grotesk", sans-serif; }
   .driver-next-stop { align-items: flex-start; flex-direction: column; }
   .drivers-overview-heading { align-items: flex-start; flex-direction: column; }
   .driver-overview-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .driver-management-form { grid-template-columns: 1fr; }
+  .driver-management-list article { align-items: flex-start; flex-direction: column; }
   .route-detail-actions { align-items: flex-end; flex-direction: column; }
   .driver-delivery { align-items: flex-start; flex-wrap: wrap; }
   .driver-delivery > div { min-width: 100%; }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginUser } from "../../api/auth.api";
 import useAuth from "../../hooks/useAuth";
+import "./LoginPage.css";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -60,23 +61,27 @@ export default function LoginPage() {
           </p>
         )}
 
-        <label>Usuario</label>
-        <input
-          type="text"
-          value={identifier}
-          onChange={(e) => setIdentifier(e.target.value)}
-        />
+        <label className="login-field">
+          Usuario
+          <input
+            type="text"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            autoComplete="username"
+          />
+        </label>
 
-        <label>Contraseña / PIN</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <label className="login-field">
+          Contraseña / PIN
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+          />
+        </label>
 
-        <button
-          type="submit"
-        >
+        <button type="submit" className="login-submit">
           Ingresar
         </button>
       </form>

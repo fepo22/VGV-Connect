@@ -1,6 +1,8 @@
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
+import dotenv from "dotenv";
 
+dotenv.config();
 const prisma = new PrismaClient();
 
 const users = [
@@ -35,56 +37,10 @@ async function main() {
     await prisma.vehicle.upsert({ where: { licensePlate }, update: { name, maxWeightKg, maxVolumeM3 }, create: { name, licensePlate, maxWeightKg, maxVolumeM3 } });
   }
 
-  await prisma.deliveryEvent.deleteMany();
-  await prisma.auditLog.deleteMany();
-  await prisma.delivery.deleteMany();
-  await prisma.route.deleteMany();
+  // Generación de datos de prueba (rutas y entregas ficticias) deshabilitada.
+  // Solo se siembran usuarios y vehículos; entregas/rutas se cargan con datos reales.
 
-  const drivers = await prisma.user.findMany({ where: { role: "driver" }, orderBy: { id: "asc" } });
-  const vehicles = await prisma.vehicle.findMany({ orderBy: { id: "asc" } });
-  const communes = ["Santiago", "Maipú", "Pudahuel", "Quilicura", "La Florida", "Puente Alto", "Las Condes", "Renca", "Ñuñoa", "San Miguel"];
-  const streets = ["Av. Providencia", "Av. Vicuña Mackenna", "Gran Avenida", "Camino Melipilla", "Av. La Florida", "Av. Matta", "Av. Grecia", "Av. Las Condes"];
-  const clients = ["Distribuidora Andina", "Comercial Los Alerces", "Farmacias del Sur", "Restaurante Central", "Ferretería Horizonte", "Importadora Vértice", "Supermercado La Plaza", "Bodega San Cristóbal"];
-  const startLat = -33.45;
-  const startLng = -70.66;
-
-  let deliverySequence = 1;
-  for (let routeIndex = 0; routeIndex < 14; routeIndex += 1) {
-    const driver = drivers[routeIndex % drivers.length];
-    const vehicle = vehicles[routeIndex % vehicles.length];
-    const routeDate = new Date(Date.now() + (routeIndex % 5) * 86400000);
-    const dateText = routeDate.toISOString().slice(0, 10);
-    const route = await prisma.route.create({ data: {
-      serviceDate: routeDate,
-      startAt: new Date(`${dateText}T${String(7 + (routeIndex % 4)).padStart(2, "0")}:30:00`),
-      origin: "Centro de Distribución VGV, Santiago",
-      destination: `${communes[routeIndex % communes.length]}, Región Metropolitana`,
-      documentType: "guide",
-      documentNumber: `RUTA-${dateText.replaceAll("-", "")}-${String(routeIndex + 1).padStart(2, "0")}`,
-      status: routeIndex < 3 ? "in_progress" : "planned",
-      driverId: driver.id,
-      vehicleId: vehicle.id,
-      distanceKm: 8 + ((routeIndex * 17) % 95),
-    }});
-
-    const routeDeliveries = [];
-    const routeCount = routeIndex < 4 ? 15 : 14;
-    for (let stop = 0; stop < routeCount; stop += 1) {
-      const sequence = deliverySequence;
-      deliverySequence += 1;
-      const street = streets[(sequence + routeIndex) % streets.length];
-      const commune = communes[(sequence + routeIndex) % communes.length];
-      const number = 100 + ((sequence * 37) % 8900);
-      const weightKg = 25 + ((sequence * 83) % Math.max(100, Math.floor(vehicle.maxWeightKg / 3)));
-      const volumeM3 = Number((0.15 + ((sequence * 17) % 180) / 100).toFixed(3));
-      const lat = Number((startLat + ((sequence * 13) % 80) / 1000).toFixed(7));
-      const lng = Number((startLng - ((sequence * 19) % 100) / 1000).toFixed(7));
-      routeDeliveries.push({ clientName: clients[sequence % clients.length], guideNumber: `GD-${dateText.replaceAll("-", "")}-${String(sequence).padStart(4, "0")}`, address: `${street} ${number}, ${commune}, Región Metropolitana`, street, streetNumber: String(number), commune, region: "Metropolitana", status: routeIndex < 2 && stop < 3 ? "completed" : routeIndex < 3 ? "in_progress" : "pending", routeId: route.id, driverId: driver.id, latitude: lat, longitude: lng, weightKg, volumeM3 });
-    }
-    await prisma.delivery.createMany({ data: routeDeliveries });
-  }
-
-  console.log("Seed creado: 200 guías, 14 rutas, 7 choferes y 7 camiones");
+  console.log("Seed creado: usuarios y vehículos (sin rutas/entregas de prueba)");
 }
 
 main().finally(() => prisma.$disconnect());

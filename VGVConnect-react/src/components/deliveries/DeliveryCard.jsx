@@ -13,7 +13,7 @@ export default function DeliveryCard({ delivery }) {
     <tr className="delivery-admin-row">
       <td data-label="Documento"><strong>{delivery.guideNumber || "Sin guía"}</strong><small>{route?.documentType === "invoice" ? "Factura" : "Guía de despacho"}</small></td>
       <td data-label="Destino"><strong>{client}</strong><small>{address}</small></td>
-      <td data-label="Ruta y chofer"><strong>{route?.documentNumber || (route ? `Ruta #${route.id}` : "Sin ruta")}</strong><small>{delivery.driverName || "Sin chofer asignado"}</small></td>
+      <td data-label="Ruta y conductor"><strong>{route?.documentNumber || (route ? `Ruta #${route.id}` : "Sin ruta")}</strong><small>{delivery.driverName || "Sin conductor asignado"}</small></td>
       <td data-label="Estado"><DeliveryStatusBadge status={status} />{completedAt && <small>Registrada: {completedAt}</small>}</td>
       <td data-label="Evidencia y seguimiento" className="delivery-admin-actions">{delivery.photoUrl ? <a href={delivery.photoUrl} target="_blank" rel="noreferrer">Ver evidencia</a> : <span>Sin foto</span>}{locationUrl ? <a href={locationUrl} target="_blank" rel="noreferrer">Ver ubicación</a> : <span>Sin ubicación</span>}{updatedAt && <small>Actualizada: {updatedAt}</small>}{delivery.observations && <small className="delivery-admin-note">{delivery.observations}</small>}</td>
     </tr>

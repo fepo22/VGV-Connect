@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 const shortcuts = [
   { to: "/entregas", icon: "▣", label: "Entregas", text: "Consulta y actualiza pedidos" },
   { to: "/rutas", icon: "↗", label: "Rutas", text: "Organiza recorridos y paradas" },
-  { to: "/choferes", icon: "◉", label: "Choferes", text: "Revisa la operación en terreno" },
+  { to: "/choferes", icon: "◉", label: "Conductores", text: "Revisa la operación en terreno" },
   { to: "/reportes", icon: "▤", label: "Reportes", text: "Analiza el rendimiento" },
 ];
 
