@@ -5,6 +5,7 @@ import DeliveriesPage from "./pages/Deliveries/DeliveriesPage";
 import Dashboard from "./pages/Dashboard/Dashboard";
 import Rutas from "./pages/Rutas/Rutas";
 import RutasChofer from "./pages/Drivers/rutas/RutasChofer";
+import Choferes from "./pages/Choferes/Choferes";
 import Reportes from "./pages/Reportes/Reportes";
 
 export default function App() {
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/entregas" element={<DeliveriesPage />} />
           <Route path="/rutas" element={<Rutas />} />
           <Route path="/rutas/choferes" element={<RutasChofer />} />
+          <Route path="/choferes" element={<Choferes />} />
           <Route path="/reportes" element={<Reportes />} />
         </Route>
       </Routes>

@@ -13,11 +13,11 @@ export default function DeliveryCard({ delivery, onSelect }) {
         cursor: "pointer",
       }}
     >
-      <h3 style={{ margin: 0 }}>{delivery.client}</h3>
-      <p style={{ margin: "4px 0" }}>{delivery.address}</p>
+      <h3 style={{ margin: 0 }}>{delivery.cliente}</h3>
+      <p style={{ margin: "4px 0" }}>{delivery.direccion}</p>
 
       <span>
-        <DeliveryStatusBadge status={delivery.status} />
+        <DeliveryStatusBadge status={delivery.estado} />
       </span>
     </div>
   );

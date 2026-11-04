@@ -1,14 +1,34 @@
-import React, { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { getOrders } from "../../api/orders.api";
 import { getDrivers } from "../../api/drivers.api";
-import { useToast } from "../../components/ui/ToastContext";
+import { useToast } from "../../components/ui/toast-context";
+
+function StatsChart({ totals }) {
+  const items = [
+    { key: "delivered", label: "Entregadas", value: totals.delivered, color: "#16a34a" },
+    { key: "inRoute", label: "En ruta", value: totals.inRoute, color: "#f59e0b" },
+    { key: "planned", label: "Planificadas", value: totals.planned, color: "#2563eb" },
+  ];
+  const max = Math.max(1, ...items.map((i) => i.value));
+  return (
+    <div style={{ display: "flex", gap: 12, alignItems: "end", height: 100 }}>
+      {items.map((it) => (
+        <div key={it.key} style={{ textAlign: "center" }}>
+          <div style={{ height: `${(it.value / max) * 80}px`, width: 36, background: it.color, borderRadius: 6, marginBottom: 6 }} />
+          <div style={{ fontSize: 12 }}>{it.label}</div>
+          <div style={{ fontWeight: 700 }}>{it.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function Reportes() {
   const [orders, setOrders] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [filter, setFilter] = useState({ driverId: "", status: "", from: "", to: "" });
   const [loading, setLoading] = useState(false);
-  const toast = useToast();
+  const { addToast } = useToast();
 
   useEffect(() => {
     (async () => {
@@ -19,12 +39,12 @@ export default function Reportes() {
         setDrivers(Array.isArray(d) ? d : []);
       } catch (e) {
         console.error("Error loading report data", e);
-        toast.addToast("Error cargando datos de reportes", "error");
+        addToast("Error cargando datos de reportes", "error");
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [addToast]);
 
   const filtered = useMemo(() => {
     return orders.filter((o) => {
@@ -54,7 +74,7 @@ export default function Reportes() {
 
   const exportCSV = () => {
     if (!filtered || filtered.length === 0) {
-      toast.addToast("No hay datos para exportar", "error");
+      addToast("No hay datos para exportar", "error");
       return;
     }
     const keys = ["id", "reference", "driverId", "driverName", "clientName", "address", "scheduledAt", "status"];
@@ -81,27 +101,7 @@ export default function Reportes() {
     a.download = `reportes_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.addToast("CSV descargado", "info");
-  };
-
-  const StatsChart = ({ totals }) => {
-    const items = [
-      { key: "delivered", label: "Entregadas", value: totals.delivered, color: "#16a34a" },
-      { key: "inRoute", label: "En ruta", value: totals.inRoute, color: "#f59e0b" },
-      { key: "planned", label: "Planificadas", value: totals.planned, color: "#2563eb" },
-    ];
-    const max = Math.max(1, ...items.map((i) => i.value));
-    return (
-      <div style={{ display: "flex", gap: 12, alignItems: "end", height: 100 }}>
-        {items.map((it) => (
-          <div key={it.key} style={{ textAlign: "center" }}>
-            <div style={{ height: `${(it.value / max) * 80}px`, width: 36, background: it.color, borderRadius: 6, marginBottom: 6 }} />
-            <div style={{ fontSize: 12 }}>{it.label}</div>
-            <div style={{ fontWeight: 700 }}>{it.value}</div>
-          </div>
-        ))}
-      </div>
-    );
+    addToast("CSV descargado", "info");
   };
 
   return (
@@ -168,7 +168,7 @@ export default function Reportes() {
           <StatsChart totals={totals} />
           <div>
             <button onClick={exportCSV} style={{ display: "block", marginBottom: 8 }}>Export CSV</button>
-            <button onClick={() => toast.addToast("Exportar gráficos próximamente", "info")}>Export Chart (png)</button>
+            <button onClick={() => addToast("Exportar gráficos próximamente", "info")}>Export Chart (png)</button>
           </div>
         </div>
       </section>
@@ -213,4 +213,4 @@ export default function Reportes() {
       </section>
     </div>
   );
-
+}

@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { getDrivers } from "../../../api/drivers.api";
 import { getOrdersByDriver, updateOrderStatus } from "../../../api/orders.api";
-import { useToast } from "../../../components/ui/ToastContext";
+import { useToast } from "../../../components/ui/toast-context";
 
 export default function RutasChofer() {
 	const [drivers, setDrivers] = useState([]);
@@ -21,19 +21,22 @@ export default function RutasChofer() {
 	}, []);
 
 	useEffect(() => {
-		if (!selectedDriver) return setOrders([]);
+		if (!selectedDriver) return;
+		let active = true;
 		(async () => {
-			setLoading(true);
 			try {
 				const data = await getOrdersByDriver(selectedDriver.id);
-				setOrders(data || []);
+				if (active) setOrders(data || []);
 			} catch (e) {
 				console.error("Error fetching driver orders", e);
-				setOrders([]);
+				if (active) setOrders([]);
 			} finally {
-				setLoading(false);
+				if (active) setLoading(false);
 			}
 		})();
+		return () => {
+			active = false;
+		};
 	}, [selectedDriver]);
 
 	const toast = useToast();
@@ -60,6 +63,8 @@ export default function RutasChofer() {
 						const id = Number(e.target.value);
 						const d = drivers.find((x) => x.id === id) || null;
 						setSelectedDriver(d);
+						setLoading(Boolean(d));
+						if (!d) setOrders([]);
 					}}
 				>
 					<option value="">-- seleccionar --</option>

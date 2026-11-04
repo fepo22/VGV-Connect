@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import RouteList from "../../components/deliveries/RouteList";
 import MapView from "../../components/maps/Mapview";
 import DeliveryDetail from "../../components/deliveries/DeliveryDetail";
 import { getDrivers } from "../../api/drivers.api";
 import { getVehicles } from "../../api/vehicles.api";
-import { getClients, getClientAddresses, createClientAddress, createClient } from "../../api/clients.api";
+import { getClients, createClientAddress, createClient } from "../../api/clients.api";
 import { createOrder, getOrders, updateOrderStatus } from "../../api/orders.api";
-import { useToast } from "../../components/ui/ToastContext";
+import { useToast } from "../../components/ui/toast-context";
 
 const sectionStyle = {
   background: "#fff",
@@ -73,7 +73,7 @@ export default function Routeplanner() {
   const [mapSearchResults, setMapSearchResults] = useState([]);
   const [mapPanTo, setMapPanTo] = useState(null);
 
-  const mapOrders = (orders) =>
+  const mapOrders = useCallback((orders) =>
     orders.map((order, index) => {
       const lat = order.address?.latitude ?? null;
       const lng = order.address?.longitude ?? null;
@@ -91,25 +91,29 @@ export default function Routeplanner() {
         geoPoint: lat && lng ? `${lat.toFixed(6)}, ${lng.toFixed(6)}` : "No disponible",
         rawOrder: order,
       };
-    });
+    }), []);
 
-  const loadRoutes = async () => {
+  const loadRoutes = useCallback(() => (
+    getOrders()
+      .then((orders) => {
+        const mapped = mapOrders(orders);
+        setRoutes(mapped);
+        setCoordinates(mapped.filter((route) => route.location).map((route) => route.location));
+      })
+      .catch((error) => {
+        console.error("Error cargando órdenes:", error);
+        setRoutes([]);
+        setCoordinates([]);
+      })
+      .finally(() => setLoading(false))
+  ), [mapOrders]);
+
+  const refreshRoutes = () => {
     setLoading(true);
-    try {
-      const orders = await getOrders();
-      const mapped = mapOrders(orders);
-      setRoutes(mapped);
-      setCoordinates(mapped.filter((route) => route.location).map((route) => route.location));
-    } catch (error) {
-      console.error("Error cargando órdenes:", error);
-      setRoutes([]);
-      setCoordinates([]);
-    } finally {
-      setLoading(false);
-    }
+    return loadRoutes();
   };
 
-  const loadOrderData = async () => {
+  const loadOrderData = useCallback(async () => {
     const provisionalDrivers = [
       { id: -1, name: "Nicolas Alvarez" },
       { id: -2, name: "Alejandro Campos" },
@@ -125,9 +129,9 @@ export default function Routeplanner() {
       { id: -12, licensePlate: "Swgr35" },
     ];
 
-    let driversData = [];
-    let vehiclesData = [];
-    let clientsData = [];
+    let driversData;
+    let vehiclesData;
+    let clientsData;
 
     try {
       driversData = await getDrivers();
@@ -163,29 +167,26 @@ export default function Routeplanner() {
       if (!mergedVehicles.find((v) => v.licensePlate === pv.licensePlate)) mergedVehicles.push(pv);
     });
 
-    setDrivers(mergedDrivers);
-    setVehicles(mergedVehicles);
-    setClients(clientsData);
-  };
-
-  useEffect(() => {
-    loadRoutes();
-    loadOrderData();
+    return { drivers: mergedDrivers, vehicles: mergedVehicles, clients: clientsData };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    loadRoutes();
+    loadOrderData()
+      .then((data) => {
+        if (!active) return;
+        setDrivers(data.drivers);
+        setVehicles(data.vehicles);
+        setClients(data.clients);
+      })
+      .catch((error) => console.error("Error cargando datos de programación:", error));
+    return () => {
+      active = false;
+    };
+  }, [loadRoutes, loadOrderData]);
+
   const toast = useToast();
-
-  const handleClientChange = async (event) => {
-    const clientId = event.target.value;
-    setForm((prev) => ({ ...prev, clientId, addressId: "" }));
-    if (!clientId) {
-      setClientAddresses([]);
-      return;
-    }
-
-    const addresses = await getClientAddresses(clientId);
-    setClientAddresses(addresses);
-  };
 
   const handleClientInputChange = async (event) => {
     const value = event.target.value;
@@ -271,22 +272,23 @@ export default function Routeplanner() {
 
     setSaving(true);
     try {
+      let clientId = form.clientId;
       let addressId = form.addressId;
 
       // If there's no clientId but a clientName, create the client first
-      if (!form.clientId && form.clientName) {
+      if (!clientId && form.clientName) {
         try {
           const newClient = await createClient({ name: form.clientName });
           if (newClient && newClient.id) {
-            form.clientId = newClient.id;
+            clientId = newClient.id;
           }
         } catch (e) {
           console.error("Error creando cliente:", e);
         }
       }
 
-      if (!addressId && form.clientId) {
-        const address = await createClientAddress(Number(form.clientId), {
+      if (!addressId && clientId) {
+        const address = await createClientAddress(Number(clientId), {
           label: `Geo ${form.latitude}, ${form.longitude}`,
           street: form.addressText || `Ubicación ${form.latitude}, ${form.longitude}`,
           city: "Georeferencia",
@@ -307,7 +309,7 @@ export default function Routeplanner() {
         status: "planned",
       };
 
-      if (form.clientId) payload.clientId = Number(form.clientId);
+      if (clientId) payload.clientId = Number(clientId);
       else payload.clientName = form.clientName;
 
       payload.addressId = addressId ? Number(addressId) : null;
@@ -324,6 +326,7 @@ export default function Routeplanner() {
         clientId: "",
         clientName: "",
         addressId: "",
+        addressText: "",
         driverId: "",
         vehicleId: "",
         scheduledAt: "",
@@ -338,12 +341,12 @@ export default function Routeplanner() {
           const mapped = mapOrders([created])[0];
           setRoutes((prev) => [mapped, ...prev]);
           setCoordinates((prev) => (mapped.location ? [mapped.location, ...prev] : prev));
-        } catch (e) {
-          // fallback to full reload
-          await loadRoutes();
+        } catch (error) {
+          console.error("Error procesando la ruta creada:", error);
+          await refreshRoutes();
         }
       } else {
-        await loadRoutes();
+        await refreshRoutes();
       }
 
       toast.addToast("Ruta programada con éxito", "info");
@@ -386,7 +389,7 @@ export default function Routeplanner() {
           </p>
         </div>
         <button
-          onClick={loadRoutes}
+          onClick={refreshRoutes}
           style={{
             border: "none",
             background: "#2d88ff",
@@ -546,7 +549,7 @@ export default function Routeplanner() {
 
           <div style={sectionStyle}>
             <h2 style={{ marginTop: 0, letterSpacing: "0.02em", color: "#0f172a" }}>Rutas programadas</h2>
-            <RouteList routes={routes} onOptimize={loadRoutes} onSelect={setSelectedRoute} />
+            <RouteList routes={routes} onOptimize={refreshRoutes} onSelect={setSelectedRoute} />
           </div>
         </div>
 

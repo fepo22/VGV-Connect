@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -22,13 +22,12 @@ export default function MapView({ coordinates, onMapClick, selectedLocation, pan
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersLayerRef = useRef(null);
-  const searchMarkerRef = useRef(null);
 
   useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) return;
+    if (!mapRef.current) return;
 
-    mapInstanceRef.current = L.map(mapRef.current, {
-      center: coordinates.length ? [coordinates[0].lat, coordinates[0].lng] : [-33.45, -70.66],
+    const map = L.map(mapRef.current, {
+      center: [-33.45, -70.66],
       zoom: 12,
       layers: [
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -36,20 +35,25 @@ export default function MapView({ coordinates, onMapClick, selectedLocation, pan
         }),
       ],
     });
-
-    mapInstanceRef.current.on("click", (event) => {
-      if (typeof onMapClick === "function") {
-        onMapClick(event.latlng);
-      }
-    });
+    mapInstanceRef.current = map;
 
     return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
+      map.remove();
+      mapInstanceRef.current = null;
+      markersLayerRef.current = null;
     };
-  }, [coordinates, onMapClick]);
+  }, []);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || typeof onMapClick !== "function") return;
+
+    const handleClick = (event) => onMapClick(event.latlng);
+    map.on("click", handleClick);
+    return () => {
+      map.off("click", handleClick);
+    };
+  }, [onMapClick]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -87,11 +91,7 @@ export default function MapView({ coordinates, onMapClick, selectedLocation, pan
 
     if (panTo && panTo.lat && panTo.lng) {
       map.setView([panTo.lat, panTo.lng], panTo.zoom || 16);
-      if (searchMarkerRef.current) {
-        try { map.removeLayer(searchMarkerRef.current); } catch (e) {}
-        searchMarkerRef.current = null;
-      }
-      searchMarkerRef.current = L.marker([panTo.lat, panTo.lng], { icon: getDefaultIcon() }).addTo(markersLayer);
+      L.marker([panTo.lat, panTo.lng], { icon: getDefaultIcon() }).addTo(markersLayer);
     }
 
     return () => {

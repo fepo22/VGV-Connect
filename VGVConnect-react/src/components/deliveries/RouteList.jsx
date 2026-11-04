@@ -1,5 +1,3 @@
-import React from "react";
-
 export default function RouteList({ routes, onOptimize, onSelect }) {
   if (!routes || routes.length === 0) {
     return (
