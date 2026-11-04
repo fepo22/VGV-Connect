@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getDriverDeliveries, registrarEntregaDriver, uploadDeliveryPhotoDriver } from "../../../api/drivers.api";
 import useAuth from "../../../hooks/useAuth";
-import { deliveryStatusOptions, getAllowedDeliveryStatuses, normalizeDeliveryStatus } from "../../../utils/deliveryStatus";
+import { deliveryStatusLabels, deliveryStatusOptions, getAllowedDeliveryStatuses, isTerminalDeliveryStatus, normalizeDeliveryStatus } from "../../../utils/deliveryStatus";
 
 export default function RegistrarEntrega() {
   const { id } = useParams();
@@ -14,6 +14,8 @@ export default function RegistrarEntrega() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [currentStatus, setCurrentStatus] = useState("pending");
+  const [deliveryRecord, setDeliveryRecord] = useState(null);
+  const [loadingDelivery, setLoadingDelivery] = useState(true);
   const [cameraOpen, setCameraOpen] = useState(false);
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
@@ -34,12 +36,17 @@ export default function RegistrarEntrega() {
     getDriverDeliveries(user.id)
       .then(({ data }) => {
         const delivery = data.find((item) => Number(item.id) === Number(id));
-        if (!delivery) return;
+        if (!delivery) {
+          setError("Esta entrega no está asignada a tu cuenta.");
+          return;
+        }
         const nextStatus = normalizeDeliveryStatus(delivery.status || delivery.estado);
+        setDeliveryRecord(delivery);
         setCurrentStatus(nextStatus);
         setStatus(nextStatus);
       })
-      .catch(() => setError("No se pudo cargar el estado actual de la entrega."));
+      .catch(() => setError("No se pudo cargar el estado actual de la entrega."))
+      .finally(() => setLoadingDelivery(false));
   }, [id, user.id]);
 
   const handlePhoto = (event) => {
@@ -95,6 +102,10 @@ export default function RegistrarEntrega() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (!deliveryRecord || isTerminalDeliveryStatus(currentStatus)) {
+      setError("La entrega tiene un resultado final y no admite nuevos registros.");
+      return;
+    }
     if (!photoUrl) {
       setError("Debes tomar o adjuntar una foto como evidencia.");
       return;
@@ -111,8 +122,8 @@ export default function RegistrarEntrega() {
       const { data } = await uploadDeliveryPhotoDriver(id, photoUrl);
       await registrarEntregaDriver(id, { status, photoUrl: data.url, location, observations, driverId: user.id, timestamp: new Date().toISOString() });
       navigate("/conductor");
-    } catch {
-      setError("No se pudo registrar la entrega. Revisa el permiso de ubicación.");
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "No se pudo registrar la entrega. Revisa el permiso de ubicación.");
     } finally {
       setSaving(false);
     }
@@ -126,7 +137,16 @@ export default function RegistrarEntrega() {
         <p>La ubicación se captura al confirmar para mantener trazabilidad.</p>
       </div>
 
-      <form className="driver-form" onSubmit={handleSubmit}>
+      {loadingDelivery ? <p role="status">Cargando entrega...</p> : !deliveryRecord ? (
+        <p className="route-error" role="alert">{error || "No se pudo encontrar la entrega asignada."}</p>
+      ) : isTerminalDeliveryStatus(currentStatus) ? (
+        <div className="driver-form">
+          <p>Esta entrega ya tiene un resultado final y está disponible solo para consulta.</p>
+          <strong>{deliveryStatusLabels[currentStatus] || currentStatus}</strong>
+          {deliveryRecord.guideNumber && <small>Guía {deliveryRecord.guideNumber}</small>}
+          <button className="secondary-action" onClick={() => navigate("/conductor")} type="button">Volver a mis entregas</button>
+        </div>
+      ) : <form className="driver-form" onSubmit={handleSubmit}>
         <label>
           Resultado
           <select value={status} onChange={(event) => setStatus(event.target.value)}>
@@ -171,7 +191,7 @@ export default function RegistrarEntrega() {
         <button className="primary-action" disabled={saving} type="submit">
           {saving ? "Registrando..." : "Confirmar entrega"}
         </button>
-      </form>
+      </form>}
     </section>
   );
 }

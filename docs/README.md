@@ -47,7 +47,7 @@ Disponible en `http://localhost:5173`.
 
 ## Usuarios de prueba
 
-El MVP usa usuarios temporales en memoria. El login se realiza con usuario y contraseña.
+Los usuarios demo solo se crean al arrancar el backend si `ENABLE_DEMO_USERS=true`, `NODE_ENV` no es `production` y la base no tiene usuarios. El login nunca crea usuarios. Usar estas credenciales únicamente en entornos locales.
 
 | Usuario | Nombre | Rol | Contraseña | Módulo principal |
 | --- | --- | --- | --- | --- |
@@ -75,7 +75,7 @@ npm.cmd run build
 
 Copia `backend/.env.example` a `backend/.env` y configura `DATABASE_URL` de PostgreSQL junto con:
 
-- `JWT_SECRET`: secreto para firmar tokens.
+- `JWT_SECRET`: obligatorio, mínimo 32 bytes; el backend no arranca sin él.
 - `DATABASE_URL`: conexión PostgreSQL para la futura persistencia.
 - `GOOGLE_DRIVE_FOLDER_ID`: carpeta de destino para evidencias.
 - `GOOGLE_SERVICE_ACCOUNT_JSON`: credenciales de la cuenta de servicio de Google Drive.

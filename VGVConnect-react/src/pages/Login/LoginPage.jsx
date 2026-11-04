@@ -23,6 +23,10 @@ export default function LoginPage() {
     try {
       const user = await loginUser(identifier, password);
       login(user);
+      if (user.mustChangePassword) {
+        navigate("/cambiar-contrasena", { replace: true });
+        return;
+      }
       const roleHome = {
         driver: "/conductor",
         route_planner: "/rutas",

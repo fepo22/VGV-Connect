@@ -3,9 +3,8 @@ import { Link } from "react-router-dom";
 import { getDriverDeliveries, getDriverHistory } from "../../api/drivers.api";
 import { getRoutes } from "../../api/routes.api";
 import useAuth from "../../hooks/useAuth";
-import { normalizeDeliveryStatus } from "../../utils/deliveryStatus";
+import { deliveryStatusLabels, isSuccessfulDeliveryStatus, isTerminalDeliveryStatus, normalizeDeliveryStatus } from "../../utils/deliveryStatus";
 
-const completedStatuses = ["completed"];
 const statusOf = (delivery) => normalizeDeliveryStatus(delivery.estado || delivery.status);
 const routeLabel = (route) => route.documentNumber || `Ruta #${route.id}`;
 const routeStatusLabels = {
@@ -35,22 +34,25 @@ export default function DashboardChofer() {
   }, [user.id]);
 
   const metrics = useMemo(() => {
-    const completed = deliveries.filter((item) => completedStatuses.includes(statusOf(item))).length;
+    const completed = deliveries.filter((item) => isSuccessfulDeliveryStatus(statusOf(item))).length;
     const incidents = deliveries.filter((item) => ["rejected", "not_found"].includes(statusOf(item))).length;
+    const pending = deliveries.filter((item) => !isTerminalDeliveryStatus(statusOf(item))).length;
     return {
       total: deliveries.length,
       completed,
-      pending: deliveries.length - completed,
+      pending,
       incidents,
       rate: deliveries.length ? Math.round((completed / deliveries.length) * 100) : 0,
     };
   }, [deliveries]);
 
   const activeRoute = routes.find((route) => ["in_progress", "planned"].includes(route.status)) || routes[0];
-  const nextStop = activeRoute?.stops?.filter((stop) => !completedStatuses.includes(stop.status)).sort((first, second) => first.sequence - second.sequence)[0];
-  const pendingDeliveries = deliveries.filter((delivery) => !completedStatuses.includes(statusOf(delivery)));
+  const nextStop = activeRoute?.stops?.filter((stop) => !isTerminalDeliveryStatus(stop.status)).sort((first, second) => first.sequence - second.sequence)[0];
+  const pendingDeliveries = deliveries.filter((delivery) => !isTerminalDeliveryStatus(statusOf(delivery)));
+  const terminalDeliveries = deliveries.filter((delivery) => isTerminalDeliveryStatus(statusOf(delivery)));
+  const routeHistory = activeRoute?.stops?.filter((stop) => isTerminalDeliveryStatus(stop.status)) || [];
   const routeStops = activeRoute?.stops || [];
-  const routeDone = routeStops.filter((stop) => completedStatuses.includes(statusOf(stop))).length;
+  const routeDone = routeStops.filter((stop) => isTerminalDeliveryStatus(statusOf(stop))).length;
   const routeProgress = routeStops.length ? Math.round((routeDone / routeStops.length) * 100) : 0;
 
   return (
@@ -78,12 +80,15 @@ export default function DashboardChofer() {
       <div className="driver-dashboard-grid">
         <section className="driver-active-route">
           <div className="panel-heading"><div><p className="eyebrow">Ruta activa</p><h3>{activeRoute ? routeLabel(activeRoute) : "Sin ruta asignada"}</h3></div><span>{routeStatusLabels[activeRoute?.status] || "-"}</span></div>
-          {activeRoute ? <><p className="driver-route-meta">{activeRoute.vehicleName} · {activeRoute.vehicleLicensePlate || "Patente pendiente"} · inicio {activeRoute.startTime}</p><p className="driver-route-destination">Destino: <strong>{activeRoute.destination}</strong></p><div className="driver-route-progress"><div><span>Avance de ruta</span><strong>{routeProgress}%</strong></div><progress value={routeProgress} max="100" /></div><div className="driver-next-stop"><div><small>Próxima parada</small><strong>{nextStop?.client || "Ruta completada"}</strong><span>{nextStop?.address || "No hay entregas pendientes"}</span></div>{nextStop && <Link className="primary-action" to={`/conductor/entregas/${nextStop.id}`}>Registrar entrega</Link>}</div></> : <p>No tienes una ruta asignada.</p>}
+          {activeRoute ? <><p className="driver-route-meta">{activeRoute.vehicleName} · {activeRoute.vehicleLicensePlate || "Patente pendiente"} · inicio {activeRoute.startTime}</p><p className="driver-route-destination">Destino: <strong>{activeRoute.destination}</strong></p><div className="driver-route-progress"><div><span>Avance de ruta</span><strong>{routeProgress}%</strong></div><progress value={routeProgress} max="100" /></div><div className="driver-next-stop"><div><small>Próxima parada</small><strong>{nextStop?.client || "Ruta al día"}</strong><span>{nextStop?.address || "No hay entregas por ejecutar"}</span></div>{nextStop && <Link className="primary-action" to={`/conductor/entregas/${nextStop.id}`}>Registrar entrega</Link>}</div>
+            {routeHistory.length > 0 && <div className="driver-terminal-history"><h4>Resultados históricos de la ruta</h4>{routeHistory.map((stop) => <div className="driver-delivery" key={stop.id}><div><strong>{stop.client}</strong><small>{stop.address} · Guía {stop.guideNumber || "pendiente"}</small></div><span>{deliveryStatusLabels[statusOf(stop)] || statusOf(stop)}</span></div>)}</div>}
+          </> : <p>No tienes una ruta asignada.</p>}
         </section>
 
         <section className="driver-deliveries">
           <div className="panel-heading"><div><p className="eyebrow">Trabajo pendiente</p><h3>Entregas por ejecutar</h3></div><span>{pendingDeliveries.length}</span></div>
-          {loading ? <p>Cargando entregas...</p> : pendingDeliveries.length === 0 ? <p>No tienes entregas pendientes.</p> : pendingDeliveries.map((delivery) => <div className="driver-delivery" key={delivery.id}><div><strong>{delivery.cliente}</strong><small>{delivery.direccion} · Guía {delivery.guideNumber || "pendiente"}</small></div><span>{statusOf(delivery)}</span><Link className="secondary-action" to={`/conductor/entregas/${delivery.id}`}>Registrar</Link></div>)}
+          {loading ? <p>Cargando entregas...</p> : pendingDeliveries.length === 0 ? <p>No tienes entregas pendientes.</p> : pendingDeliveries.map((delivery) => <div className="driver-delivery" key={delivery.id}><div><strong>{delivery.cliente}</strong><small>{delivery.direccion} · Guía {delivery.guideNumber || "pendiente"}</small></div><span>{deliveryStatusLabels[statusOf(delivery)] || statusOf(delivery)}</span><Link className="secondary-action" to={`/conductor/entregas/${delivery.id}`}>Registrar</Link></div>)}
+          {!loading && terminalDeliveries.length > 0 && <div className="driver-terminal-history"><h4>Resultados terminales de tus entregas</h4>{terminalDeliveries.map((delivery) => <div className="driver-delivery" key={delivery.id}><div><strong>{delivery.cliente}</strong><small>{delivery.direccion} · Guía {delivery.guideNumber || "pendiente"}</small></div><span>{deliveryStatusLabels[statusOf(delivery)] || statusOf(delivery)}</span></div>)}</div>}
         </section>
       </div>
 

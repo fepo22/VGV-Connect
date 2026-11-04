@@ -3,6 +3,9 @@ import { PrismaClient } from "@prisma/client";
 import dotenv from "dotenv";
 
 dotenv.config();
+if (process.env.NODE_ENV === "production") {
+  throw new Error("El seed no se puede ejecutar en produccion.");
+}
 const prisma = new PrismaClient();
 
 const baseUsers = [
@@ -15,7 +18,7 @@ async function main() {
   for (const [username, name, role, password] of baseUsers) {
     await prisma.user.upsert({
       where: { username },
-      update: { name, role, passwordHash: await bcrypt.hash(password, 10) },
+      update: {},
       create: { username, name, role, passwordHash: await bcrypt.hash(password, 10) },
     });
   }

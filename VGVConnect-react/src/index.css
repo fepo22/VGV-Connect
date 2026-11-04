@@ -458,18 +458,15 @@ h1, h2, h3 { font-family: "Space Grotesk", sans-serif; }
 .driver-overview-stats b { color: var(--ink); font-size: 14px; }
 .driver-route-lines { display: grid; gap: 4px; color: var(--muted); font-size: 11px; }
 .driver-management { display: grid; gap: 16px; padding: 22px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
-.driver-credential-card { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: center; padding: 14px; border: 1px solid rgba(40,167,69,0.35); border-radius: 12px; color: #1e7a34; background: rgba(40,167,69,0.08); }
-.driver-credential-card small, .driver-credential-card strong { display: block; }
-.driver-credential-card small { font-size: 11px; font-weight: 700; text-transform: uppercase; }
-.driver-credential-card strong { margin-top: 4px; color: var(--ink); font-size: 16px; }
-.driver-credential-card > span { padding: 8px 12px; border-radius: 10px; color: #fff; background: #1e7a34; font: 700 20px/1 "Space Grotesk", sans-serif; letter-spacing: .08em; }
-.driver-credential-card p { grid-column: 1 / -1; margin: 0; color: #2d6b45; font-size: 12px; }
 .driver-management-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 14px; border-radius: 12px; background: #f8fbfa; }
 .driver-management-form-title { grid-column: 1 / -1; }
 .driver-management-form-title h4 { margin-top: 4px; color: var(--ink); font-size: 18px; }
 .driver-management-form label { display: grid; gap: 7px; color: var(--ink); font-size: 12px; font-weight: 700; }
 .driver-management-form input, .driver-management-form select { min-height: 42px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #fbfcfb; font: inherit; }
 .driver-management-actions { display: flex; grid-column: 1 / -1; gap: 10px; }
+.password-change { max-width: 960px; }
+.password-change-hint { grid-column: 1 / -1; margin: 0; color: var(--muted, #5f6f6b); font-size: 12px; }
+.password-change-success { padding: 12px 14px; border: 1px solid rgba(40,167,69,0.35); border-radius: 10px; color: #1e7a34; background: rgba(40,167,69,0.08); }
 .driver-management-list { display: grid; gap: 8px; }
 .driver-management-list article { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfb; }
 .driver-management-avatar { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: #fff; background: var(--navy); font-size: 12px; font-weight: 700; }
@@ -524,8 +521,6 @@ h1, h2, h3 { font-family: "Space Grotesk", sans-serif; }
   .driver-management-list article { grid-template-columns: auto 1fr; align-items: flex-start; }
   .driver-management-list article > div:last-child { grid-column: 1 / -1; width: 100%; }
   .driver-management-list article > div:last-child button { flex: 1; }
-  .driver-credential-card { grid-template-columns: 1fr; }
-  .driver-credential-card > span { justify-self: start; }
   .route-detail-actions { align-items: flex-end; flex-direction: column; }
   .driver-delivery { align-items: flex-start; flex-wrap: wrap; }
   .driver-delivery > div { min-width: 100%; }

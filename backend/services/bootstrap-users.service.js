@@ -17,12 +17,11 @@ const DEMO_USERS = [
 let bootstrapChecked = false;
 
 export const ensureDemoUsers = async () => {
+  if (process.env.NODE_ENV === "production" || process.env.ENABLE_DEMO_USERS !== "true") return;
   if (bootstrapChecked) return;
   bootstrapChecked = true;
 
   try {
-    if (process.env.ENABLE_DEMO_USERS === "false") return;
-
     const totalUsers = await prisma.user.count();
     if (totalUsers > 0) return;
 

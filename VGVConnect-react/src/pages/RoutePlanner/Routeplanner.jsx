@@ -1,9 +1,10 @@
 import { Link } from "react-router-dom";
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import RouteList from "../../components/deliveries/RouteList";
 import MapView from "../../components/maps/Mapview";
 import { createRoute, deleteRoute, getRoutes, optimizeRoute, updateRoute } from "../../api/routes.api";
 import { deliveryStatusOptions, getAllowedDeliveryStatuses } from "../../utils/deliveryStatus";
+import { buildRouteFormState, groupRouteStops, hasRouteChanges, mergeRouteFormState } from "../../utils/routePlanner";
 
 const initialForm = {
   date: new Date().toISOString().slice(0, 10),
@@ -60,21 +61,13 @@ const routeTypeConfig = {
   },
 };
 
-const normalizeFormStops = (stops = []) =>
-  (Array.isArray(stops) ? stops : []).map((stop) => ({
-    id: stop.id ?? null,
-    client: stop.client || stop.clientName || "Punto de descarga",
-    address: stop.address || stop.direccion || "",
-    guideNumber: stop.guideNumber || "",
-    status: stop.status || "pending",
-  }));
-
 const routeStatusOptions = [
   { value: "draft", label: "Borrador" },
   { value: "planned", label: "Planificado" },
   { value: "in_progress", label: "En progreso" },
   { value: "completed", label: "Completado" },
 ];
+const terminalStopStatuses = new Set(["completed", "rejected", "not_found"]);
 
 const routeTransitions = {
   draft: ["draft", "planned"],
@@ -89,6 +82,9 @@ const formatRouteStatusLabel = (status) => ({
   in_progress: "En progreso",
   completed: "Completado",
   pending: "Pendiente",
+  rejected: "Rechazada",
+  not_found: "No encontrada",
+  mixed: "Estados mixtos",
 })[status] || status;
 
 const isDeliveryRoute = (route) => ["delivery", "route"].includes(route.documentType);
@@ -111,6 +107,9 @@ export default function Routeplanner({ routeType = "delivery" }) {
   const [unassignedSearch, setUnassignedSearch] = useState("");
   const [expandedSections, setExpandedSections] = useState({ routes: true, unassigned: true, form: true, stops: true, quickDelivery: true, quickPickup: true });
   const deferredRouteSearch = useDeferredValue(routeSearch.trim().toLowerCase());
+  const routesRequestRef = useRef(0);
+  const selectedRouteRef = useRef(selectedRoute);
+  const editingIdRef = useRef(editingId);
 
   const toggleSection = (section) => {
     setExpandedSections((current) => ({
@@ -120,18 +119,30 @@ export default function Routeplanner({ routeType = "delivery" }) {
   };
 
   const loadRoutes = useCallback(async () => {
+    // Solo la última solicitud puede actualizar el estado; las respuestas de un tipo de ruta anterior se descartan.
+    const requestId = ++routesRequestRef.current;
+    const isLatestRequest = () => requestId === routesRequestRef.current;
     setLoading(true);
     try {
       const { data } = await getRoutes(mode.documentType ? { type: mode.documentType } : undefined);
+      if (!isLatestRequest()) return;
       setRoutes(data.routes);
       setAvailableStops(data.availableStops || []);
       setDrivers(data.drivers);
       setVehicles(data.vehicles);
-      setSelectedRoute((current) => data.routes.find((route) => route.id === current?.id) || data.routes[0] || null);
+      const previousRoute = selectedRouteRef.current;
+      const refreshedRoute = data.routes.find((route) => route.id === previousRoute?.id) || data.routes[0] || null;
+      selectedRouteRef.current = refreshedRoute;
+      setSelectedRoute(refreshedRoute);
+      if (previousRoute && editingIdRef.current === previousRoute.id) {
+        setForm((currentForm) => hasRouteChanges(previousRoute, currentForm, initialForm.date)
+          ? mergeRouteFormState(previousRoute, refreshedRoute, currentForm, initialForm.date)
+          : buildRouteFormState(refreshedRoute, initialForm.date));
+      }
     } catch {
-      setError("No se pudieron cargar las rutas.");
+      if (isLatestRequest()) setError("No se pudieron cargar las rutas.");
     } finally {
-      setLoading(false);
+      if (isLatestRequest()) setLoading(false);
     }
   }, [mode.documentType]);
 
@@ -167,48 +178,17 @@ export default function Routeplanner({ routeType = "delivery" }) {
     latest: summary.routes.slice(0, 3),
   })), [routes]);
   const selectedStops = useMemo(() => selectedRoute?.stops || [], [selectedRoute]);
-  const groupedStops = useMemo(() => {
-    const groups = new Map();
-
-    selectedStops.forEach((stop) => {
-      const key = `${stop.client || mode.defaultStopClient}::${stop.address || "Sin dirección"}`;
-      const current = groups.get(key) || {
-        id: key,
-        client: stop.client || mode.defaultStopClient,
-        address: stop.address || "Sin dirección",
-        documents: [],
-        status: stop.status || selectedRoute?.status || "pending",
-      };
-
-      if (stop.guideNumber) {
-        current.documents.push(stop.guideNumber);
-      }
-
-      groups.set(key, current);
-    });
-
-    return Array.from(groups.values()).map((group, index) => ({
-      ...group,
-      sequence: index + 1,
-      documents: [...new Set(group.documents)],
-    }));
-  }, [mode.defaultStopClient, selectedRoute, selectedStops]);
+  const groupedStops = useMemo(
+    () => groupRouteStops(selectedStops, mode.defaultStopClient),
+    [mode.defaultStopClient, selectedStops],
+  );
 
   const selectRoute = (route) => {
+    selectedRouteRef.current = route;
+    editingIdRef.current = route.id;
     setSelectedRoute(route);
     setEditingId(route.id);
-    setForm({
-      date: route.date || initialForm.date,
-      startTime: route.startTime || initialForm.startTime,
-      origin: route.origin || "",
-      destination: route.destination || "",
-      driverId: route.driverId ? String(route.driverId) : "",
-      vehicleId: route.vehicleId ? String(route.vehicleId) : "",
-      weightKg: route.weightKg || "",
-      volumeM3: route.volumeM3 || "",
-      deliveryDate: route.deliveryDate || "",
-      stops: normalizeFormStops(route.stops || []),
-    });
+    setForm(buildRouteFormState(route, initialForm.date));
   };
 
   const handleAddStop = () => {
@@ -272,20 +252,22 @@ export default function Routeplanner({ routeType = "delivery" }) {
   const handleUpdateStop = (index, field, value) => {
     setForm((current) => ({
       ...current,
-      stops: (current.stops || []).map((stop, stopIndex) => (stopIndex === index ? { ...stop, [field]: value } : stop)),
+      stops: (current.stops || []).map((stop, stopIndex) =>
+        stopIndex === index && !terminalStopStatuses.has(stop.status) ? { ...stop, [field]: value } : stop,
+      ),
     }));
   };
 
   const handleRemoveStop = (index) => {
     setForm((current) => ({
       ...current,
-      stops: (current.stops || []).filter((_, stopIndex) => stopIndex !== index),
+      stops: (current.stops || []).filter((stop, stopIndex) => stopIndex !== index || terminalStopStatuses.has(stop.status)),
     }));
   };
 
   const submitRoute = async (event) => {
     if (event) event.preventDefault();
-    if (editingId && selectedRoute && hasRouteChanges(selectedRoute, form)) {
+    if (editingId && selectedRoute && hasRouteChanges(selectedRoute, form, initialForm.date)) {
       const confirmed = window.confirm("Hay cambios en la ruta. ¿Deseas guardar los puntos de descarga y los datos modificados?");
       if (!confirmed) {
         return;
@@ -298,50 +280,14 @@ export default function Routeplanner({ routeType = "delivery" }) {
       if (editingId) await updateRoute(editingId, nextPayload);
       else await createRoute(nextPayload);
       setForm(initialForm);
+      editingIdRef.current = null;
       setEditingId(null);
       await loadRoutes();
-    } catch {
-      setError(editingId ? "No se pudieron guardar los cambios de la ruta." : "No se pudo crear la ruta.");
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || (editingId ? "No se pudieron guardar los cambios de la ruta." : "No se pudo crear la ruta."));
     } finally {
       setSaving(false);
     }
-  };
-
-  const buildRouteFormState = (route) => ({
-    date: route?.date || initialForm.date,
-    startTime: route?.startTime || initialForm.startTime,
-    origin: route?.origin || "",
-    destination: route?.destination || "",
-    driverId: route?.driverId ? String(route.driverId) : "",
-    vehicleId: route?.vehicleId ? String(route.vehicleId) : "",
-    weightKg: route?.weightKg || "",
-    volumeM3: route?.volumeM3 || "",
-    deliveryDate: route?.deliveryDate || "",
-    stops: normalizeFormStops(route?.stops || []),
-  });
-
-  const hasRouteChanges = (route, currentForm) => {
-    if (!route) return false;
-    const nextForm = buildRouteFormState(route);
-    return JSON.stringify({
-      ...nextForm,
-      stops: (currentForm.stops || []).map((stop) => ({
-        id: stop.id ?? null,
-        client: (stop.client || mode.defaultStopClient).trim(),
-        address: (stop.address || "").trim(),
-        guideNumber: (stop.guideNumber || "").trim(),
-        status: stop.status || "pending",
-      })),
-    }) !== JSON.stringify({
-      ...nextForm,
-      stops: (nextForm.stops || []).map((stop) => ({
-        id: stop.id ?? null,
-        client: (stop.client || mode.defaultStopClient).trim(),
-        address: (stop.address || "").trim(),
-        guideNumber: (stop.guideNumber || "").trim(),
-        status: stop.status || "pending",
-      })),
-    });
   };
 
   const handleSubmit = async (event) => {
@@ -354,12 +300,16 @@ export default function Routeplanner({ routeType = "delivery" }) {
     setError("");
     try {
       await deleteRoute(selectedRoute.id);
+      selectedRouteRef.current = null;
+      editingIdRef.current = null;
       setSelectedRoute(null);
       setEditingId(null);
       setForm(initialForm);
       await loadRoutes();
-    } catch {
-      setError("No se pudo eliminar la ruta.");
+    } catch (requestError) {
+      setError(requestError.response?.status === 409
+        ? requestError.response?.data?.message || "La ruta conserva historial operativo y no puede eliminarse porque contiene entregas terminales."
+        : requestError.response?.data?.message || "No se pudo eliminar la ruta.");
     } finally {
       setSaving(false);
     }
@@ -371,18 +321,19 @@ export default function Routeplanner({ routeType = "delivery" }) {
     try {
       await optimizeRoute(selectedRoute.id);
       await loadRoutes();
-    } catch {
-      setError("No se pudo optimizar la ruta.");
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "No se pudo optimizar la ruta.");
     }
   };
 
   const handleStatus = async (status) => {
     if (!selectedRoute) return;
+    setError("");
     try {
       await updateRoute(selectedRoute.id, { status });
       await loadRoutes();
-    } catch {
-      setError("No se pudo actualizar el estado.");
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "No se pudo actualizar el estado.");
     }
   };
 
@@ -522,16 +473,20 @@ export default function Routeplanner({ routeType = "delivery" }) {
                         <div className="route-stop-editor-list">
                           {form.stops.map((stop, index) => (
                             <div className="route-stop-editor-item" key={`${stop.id ?? "new"}-${index}`}>
+                              {terminalStopStatuses.has(stop.status) && <small className="route-field-help">Resultado final: esta entrega no se puede modificar ni quitar desde planificación.</small>}
                               <div className="route-form-fields compact">
-                                <label>Cliente<input value={stop.client} onChange={(event) => handleUpdateStop(index, "client", event.target.value)} placeholder="Nombre del punto" /></label>
-                                <label>Guía / documento<input value={stop.guideNumber} onChange={(event) => handleUpdateStop(index, "guideNumber", event.target.value)} placeholder="GD-0001" /></label>
+                                <label>Cliente<input disabled={terminalStopStatuses.has(stop.status)} value={stop.client} onChange={(event) => handleUpdateStop(index, "client", event.target.value)} placeholder="Nombre del punto" /></label>
+                                <label>Guía / documento<input disabled={terminalStopStatuses.has(stop.status)} value={stop.guideNumber} onChange={(event) => handleUpdateStop(index, "guideNumber", event.target.value)} placeholder="GD-0001" /></label>
                               </div>
-                              <label>Dirección<input value={stop.address} onChange={(event) => handleUpdateStop(index, "address", event.target.value)} placeholder="Dirección completa" /></label>
+                              <label>Dirección<input disabled={terminalStopStatuses.has(stop.status)} value={stop.address} onChange={(event) => handleUpdateStop(index, "address", event.target.value)} placeholder="Dirección completa" /></label>
                               <div className="route-stop-editor-actions">
-                                <select value={stop.status || "pending"} onChange={(event) => handleUpdateStop(index, "status", event.target.value)}>
-                                  {deliveryStatusOptions.filter((option) => stop.id == null ? option.value === "pending" : getAllowedDeliveryStatuses(stop.status).includes(option.value)).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                <select disabled={terminalStopStatuses.has(stop.status)} value={stop.status || "pending"} onChange={(event) => handleUpdateStop(index, "status", event.target.value)}>
+                                  {deliveryStatusOptions.filter((option) => terminalStopStatuses.has(stop.status)
+                                    ? option.value === stop.status
+                                    : !terminalStopStatuses.has(option.value) && (stop.id == null ? option.value === "pending" : getAllowedDeliveryStatuses(stop.status).includes(option.value)))
+                                    .map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                 </select>
-                                <button className="danger-action small" onClick={() => handleRemoveStop(index)} type="button">Quitar</button>
+                                <button className="danger-action small" disabled={terminalStopStatuses.has(stop.status)} onClick={() => handleRemoveStop(index)} type="button">Quitar</button>
                               </div>
                             </div>
                           ))}
@@ -556,7 +511,7 @@ export default function Routeplanner({ routeType = "delivery" }) {
               <div className="route-stops">
                 <h4>{mode.stopLabel}</h4>
                 {groupedStops.map((stop, index) => {
-                  const stopStatus = stop.status || selectedRoute.status || "pending";
+                  const stopStatus = stop.status || "pending";
                   const badgeText = stop.documents.length > 0 ? stop.documents.join(", ") : "Sin guía asociada";
 
                   return (
@@ -566,6 +521,14 @@ export default function Routeplanner({ routeType = "delivery" }) {
                         <strong>{stop.client}</strong>
                         <small>{stop.address}</small>
                         <small className="route-stop-documents">Guías: {badgeText}</small>
+                        {stop.status === "mixed" || stop.stops.length > 1 ? <details>
+                          <summary>Ver estado de cada entrega</summary>
+                          {stop.stops.map((item) => (
+                            <small key={item.id}>
+                              {item.guideNumber || `Entrega #${item.id}`}: {formatRouteStatusLabel(item.status || "pending")}
+                            </small>
+                          ))}
+                        </details> : null}
                       </span>
                       <em>{formatRouteStatusLabel(stopStatus)}</em>
                     </div>

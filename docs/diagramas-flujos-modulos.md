@@ -89,17 +89,17 @@ sequenceDiagram
   participant DB as PostgreSQL
   participant Audit as AuditLog
 
-  Admin->>UI: Crea conductor con nombre, usuario y patente opcional
+  Admin->>UI: Crea conductor con nombre, usuario, patente opcional y clave provisoria confirmada
   UI->>API: POST /drivers
-  API->>API: Genera contraseña provisoria de 4 dígitos
-  API->>DB: Crea usuario con rol driver
+  API->>API: Valida confirmación y política de contraseñas
+  API->>DB: Crea usuario con rol driver, hash de la clave y cambio obligatorio
   API->>Audit: Registra driver_created
-  API-->>UI: Devuelve conductor y contraseña provisoria
-  UI-->>Admin: Muestra credenciales temporales
+  API-->>UI: Devuelve el conductor sin contraseña
+  UI-->>Admin: Confirma el alta sin volver a mostrar la clave
 
   Admin->>UI: Edita conductor
   UI->>API: PUT /drivers/:id
-  API->>DB: Actualiza nombre, usuario, password o vehículo predeterminado
+  API->>DB: Actualiza nombre, usuario o vehículo predeterminado (la clave solo cambia con reset-password)
   API->>Audit: Registra driver_updated
 
   Admin->>UI: Elimina conductor
@@ -118,16 +118,14 @@ sequenceDiagram
   participant RouteUI as RoutePlanner.jsx
   participant RoutesAPI as /routes
   participant DeliveriesAPI as /deliveries
+  participant Audit as AuditLog
   participant Status as status-transitions.service
   participant DB as PostgreSQL
 
   Planner->>RouteUI: Define origen, destino, fecha, documento, conductor y vehículo
   RouteUI->>RoutesAPI: Crea o actualiza ruta
-  RoutesAPI->>DB: Guarda Route
-
-  Planner->>RouteUI: Agrega o asocia entregas
-  RouteUI->>DeliveriesAPI: Crea o actualiza Delivery
-  DeliveriesAPI->>DB: Guarda Delivery con routeId y driverId
+  RoutesAPI->>DB: Valida conductor, vehículo y paradas; actualiza Route y Delivery en una transacción
+  RoutesAPI->>Audit: Registra route_reassigned si cambia el conductor
 
   actor Driver as Conductor
   Driver->>RouteUI: Abre entrega asignada
@@ -136,6 +134,23 @@ sequenceDiagram
   Status-->>DeliveriesAPI: Transición válida
   DeliveriesAPI->>DB: Actualiza Delivery y crea DeliveryEvent
 ```
+
+### Consistencia de asignaciones e historial
+
+- `Route.driverId` es la fuente de verdad para las entregas no terminales (`pending`, `planned`, `in_progress`). Al reasignar una ruta, esas entregas cambian al nuevo conductor en la misma transacción; si no cambia el conductor, no se reescriben.
+- Las paradas creadas con `POST /routes` comienzan en estado `pending`; la planificación no puede crear una entrega con resultado final.
+- Las entregas terminales (`completed`, `rejected`, `not_found`) conservan el conductor que las ejecutó y no se pueden editar ni quitar desde `PUT /routes/:id`; sus cambios pertenecen al flujo operacional de entregas.
+- `toRemove` solo libera entregas no terminales, estableciendo `routeId` y `driverId` en `null`. El intento de quitar una terminal responde HTTP 400 sin escrituras.
+- La eliminación física de una ruta con entregas terminales se rechaza con HTTP 409. Sin terminales, las entregas se liberan y la ruta se elimina en una transacción.
+- Las reasignaciones y eliminaciones se auditan dentro de la transacción, por lo que un fallo no deja una entrada de auditoría de una operación no confirmada.
+
+### Check preoperacional y autorización de vehículos
+
+- El conductor se identifica desde el JWT; los `driverId` del payload no cambian su identidad ni el alcance de sus checks.
+- Un conductor puede inspeccionar su vehículo predeterminado o el de una ruta `draft`, `planned` o `in_progress` cuya fecha de servicio no sea histórica. Las rutas completadas e históricas no autorizan un vehículo.
+- Los administradores pueden consultar y guardar checks para conductores existentes con rol `driver`; las operaciones registran el conductor afectado en la auditoría.
+- La foto debe cargarse mediante el servicio de imágenes existente. No se aceptan URLs arbitrarias; al actualizar un check se puede conservar únicamente la URL ya almacenada para ese mismo check.
+- Si no hay vehículo autorizado, la interfaz informa que el conductor debe contactar a administración y no permite enviar un check.
 
 ## Modelo de datos principal
 

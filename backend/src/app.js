@@ -12,6 +12,10 @@ import openApiDocument from "../docs/openapi.js";
 const app = express();
 const defaultOrigins = ["http://localhost:5173", "http://127.0.0.1:5173"];
 const allowedOrigins = process.env.CORS_ORIGINS?.split(",").map((origin) => origin.trim()).filter(Boolean) || defaultOrigins;
+const trustProxy = process.env.TRUST_PROXY?.trim();
+
+// Necesario detrás de un proxy (p. ej. Railway) para que el límite de login use la IP real del cliente.
+if (trustProxy && trustProxy !== "false") app.set("trust proxy", /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy.split(",").map((value) => value.trim()));
 
 app.use(cors({
 	origin(origin, callback) {

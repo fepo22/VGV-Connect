@@ -35,6 +35,8 @@ model User {
   username    String       @unique
   name        String
   passwordHash String
+  mustChangePassword Boolean @default(false)
+  passwordChangedAt DateTime?
   role        UserRole
   defaultVehicleId Int?
   defaultVehicle Vehicle? @relation("DefaultVehicle", fields: [defaultVehicleId], references: [id])

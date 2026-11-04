@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import prisma from "../prismaClient.js";
 import { logAudit } from "../services/audit.service.js";
+import { validateNewPassword } from "../services/password-policy.service.js";
 
 const driverSelect = {
   id: true,
@@ -26,6 +27,17 @@ const isNameTakenByAnotherDriver = async (name, excludeId) => {
   return Boolean(existing);
 };
 
+// Alta y renovación comparten reglas: la clave provisoria la define y confirma el administrador,
+// cumple la política de B5 y nunca se devuelve ni se registra.
+const readTemporaryPassword = (body, context) => {
+  const password = typeof body?.temporaryPassword === "string" ? body.temporaryPassword : "";
+  const confirmation = typeof body?.temporaryPasswordConfirmation === "string" ? body.temporaryPasswordConfirmation : "";
+  if (!password) return { error: "Ingresa la contraseña provisoria" };
+  if (password !== confirmation) return { error: "La confirmación no coincide con la contraseña provisoria" };
+  const policyError = validateNewPassword(password, context);
+  return policyError ? { error: policyError } : { password };
+};
+
 export const getDrivers = async (_req, res) => {
   const [drivers, vehicles] = await Promise.all([
     prisma.user.findMany({
@@ -38,25 +50,23 @@ export const getDrivers = async (_req, res) => {
   res.json({ drivers, vehicles });
 };
 
-const generateTemporaryPassword = () => Math.floor(1000 + Math.random() * 9000).toString();
-
 export const createDriver = async (req, res) => {
   const name = String(req.body.name || "").trim();
   const username = String(req.body.username || "").trim();
   const defaultVehicleId = await parseDefaultVehicleId(req.body.defaultVehicleId);
   if (!name || !username) return res.status(400).json({ message: "Nombre y usuario son obligatorios" });
   if (defaultVehicleId === undefined) return res.status(400).json({ message: "La patente predeterminada no es válida" });
+  const temporary = readTemporaryPassword(req.body, { username, name });
+  if (temporary.error) return res.status(400).json({ message: temporary.error });
   if (await isNameTakenByAnotherDriver(name)) return res.status(409).json({ message: "Ya existe un conductor con ese nombre" });
-
-  const temporaryPassword = generateTemporaryPassword();
 
   try {
     const driver = await prisma.user.create({
-      data: { name, username, role: "driver", passwordHash: await bcrypt.hash(temporaryPassword, 10), defaultVehicleId },
+      data: { name, username, role: "driver", passwordHash: await bcrypt.hash(temporary.password, 10), mustChangePassword: true, passwordChangedAt: new Date(), defaultVehicleId },
       select: driverSelect,
     });
     await logAudit({ action: "driver_created", userId: req.user.sub, entity: "driver", entityId: driver.id });
-    res.status(201).json({ ...driver, temporaryPassword });
+    res.status(201).json({ ...driver, mustChangePassword: true });
   } catch (error) {
     if (error.code === "P2002") return res.status(409).json({ message: "El usuario ya está en uso" });
     throw error;
@@ -65,8 +75,12 @@ export const createDriver = async (req, res) => {
 
 export const updateDriver = async (req, res) => {
   const id = Number(req.params.id);
-  const existing = await prisma.user.findFirst({ where: { id, role: "driver" }, select: { id: true } });
+  const existing = await prisma.user.findFirst({ where: { id, role: "driver" }, select: { id: true, username: true, name: true } });
   if (!existing) return res.status(404).json({ message: "Conductor no encontrado" });
+  // La clave solo cambia por POST /drivers/:id/reset-password (confirmación, política, revocación y auditoría propia).
+  if (["password", "temporaryPassword", "temporaryPasswordConfirmation"].some((key) => req.body?.[key] != null && req.body[key] !== "")) {
+    return res.status(400).json({ message: "La contraseña no se modifica al editar el conductor. Usa la renovación de clave." });
+  }
 
   const data = {};
   if (req.body.name !== undefined) {
@@ -79,10 +93,6 @@ export const updateDriver = async (req, res) => {
     const username = String(req.body.username).trim();
     if (!username) return res.status(400).json({ message: "El usuario es obligatorio" });
     data.username = username;
-  }
-  if (req.body.password !== undefined && req.body.password !== "") {
-    if (String(req.body.password).length < 4) return res.status(400).json({ message: "La contraseña debe tener al menos 4 caracteres" });
-    data.passwordHash = await bcrypt.hash(String(req.body.password), 10);
   }
   if (req.body.defaultVehicleId !== undefined) {
     const defaultVehicleId = await parseDefaultVehicleId(req.body.defaultVehicleId);
@@ -98,6 +108,21 @@ export const updateDriver = async (req, res) => {
     if (error.code === "P2002") return res.status(409).json({ message: "El usuario ya está en uso" });
     throw error;
   }
+};
+
+export const resetDriverPassword = async (req, res) => {
+  const id = Number(req.params.id);
+  const driver = await prisma.user.findFirst({ where: { id, role: "driver" }, select: { id: true, username: true, name: true } });
+  if (!driver) return res.status(404).json({ message: "Conductor no encontrado" });
+  const temporary = readTemporaryPassword(req.body, { username: driver.username, name: driver.name });
+  if (temporary.error) return res.status(400).json({ message: temporary.error });
+  await prisma.user.update({
+    where: { id },
+    data: { passwordHash: await bcrypt.hash(temporary.password, 10), mustChangePassword: true, passwordChangedAt: new Date() },
+    select: { id: true },
+  });
+  await logAudit({ action: "driver_password_reset", userId: req.user.sub, entity: "driver", entityId: id });
+  res.json({ id, username: driver.username, mustChangePassword: true });
 };
 
 export const deleteDriver = async (req, res) => {

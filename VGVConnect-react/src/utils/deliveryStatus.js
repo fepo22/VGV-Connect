@@ -15,6 +15,19 @@ export const normalizeDeliveryStatus = (value) => {
   return aliases[status] || status;
 };
 
+export const terminalDeliveryStatuses = new Set(["completed", "rejected", "not_found"]);
+export const isTerminalDeliveryStatus = (status) => terminalDeliveryStatuses.has(normalizeDeliveryStatus(status));
+export const isSuccessfulDeliveryStatus = (status) => normalizeDeliveryStatus(status) === "completed";
+
+export const deliveryStatusLabels = {
+  pending: "Pendiente",
+  planned: "Planificada",
+  in_progress: "En progreso",
+  completed: "Completada",
+  rejected: "Rechazada",
+  not_found: "No encontrada",
+};
+
 export const deliveryStatusOptions = [
   { value: "pending", label: "Pendiente" },
   { value: "planned", label: "Planificado" },

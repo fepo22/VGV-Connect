@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getRoutes } from "../../api/routes.api";
 import { getVehicleChecks, saveVehicleCheck } from "../../api/vehicle-checks.api";
 import useAuth from "../../hooks/useAuth";
-
-const today = new Date().toISOString().slice(0, 10);
+import { getOperationalDate } from "../../utils/operationalDate";
 
 const checklistSections = [
   {
@@ -61,12 +60,12 @@ const statusLabels = {
   pending: "Pendiente",
 };
 
-const buildStorageKey = (userId, vehicleId) => `vgv-vehicle-check:${userId}:${vehicleId || "sin-vehiculo"}:${today}`;
+const buildStorageKey = (userId, vehicleId, checkDate) => `vgv-vehicle-check:${userId}:${vehicleId || "sin-vehiculo"}:${checkDate}`;
 const isSmokeTestPhoto = (value) => value === "data:image/jpeg;base64,Zm90bw==";
 
 const readSavedCheck = (storageKey) => {
   const saved = localStorage.getItem(storageKey);
-  if (!saved) return { checks: initialChecks, odometer: "", odometerPhoto: "", observations: "", savedAt: "" };
+  if (!saved) return { checks: initialChecks, odometer: "", odometerPhoto: "", observations: "", savedAt: "", source: null };
 
   try {
     const parsed = JSON.parse(saved);
@@ -76,9 +75,10 @@ const readSavedCheck = (storageKey) => {
       odometerPhoto: isSmokeTestPhoto(parsed.odometerPhoto) ? "" : parsed.odometerPhoto || "",
       observations: parsed.observations || "",
       savedAt: parsed.savedAt || "",
+      source: ["server", "draft"].includes(parsed.source) ? parsed.source : "unknown",
     };
   } catch {
-    return { checks: initialChecks, odometer: "", odometerPhoto: "", observations: "", savedAt: "" };
+    return { checks: initialChecks, odometer: "", odometerPhoto: "", observations: "", savedAt: "", source: null };
   }
 };
 
@@ -94,6 +94,7 @@ const isRenderableImage = (value) => value?.startsWith("data:image/") || value?.
 
 export default function CheckVehiculo() {
   const { user } = useAuth();
+  const today = getOperationalDate();
   const [vehicles, setVehicles] = useState([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState("");
   const [checks, setChecks] = useState(initialChecks);
@@ -101,15 +102,21 @@ export default function CheckVehiculo() {
   const [odometerPhoto, setOdometerPhoto] = useState("");
   const [observations, setObservations] = useState("");
   const [savedAt, setSavedAt] = useState("");
+  const [localCopy, setLocalCopy] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [checkLoading, setCheckLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [vehicleLoadError, setVehicleLoadError] = useState("");
+  const [checkLoadError, setCheckLoadError] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [photoPreviewError, setPhotoPreviewError] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const vehicleChecksRequestRef = useRef(0);
 
   const closeCamera = () => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -122,55 +129,144 @@ export default function CheckVehiculo() {
   }, []);
 
   useEffect(() => {
-    getRoutes(user.id)
-      .then(async ({ data }) => {
+    let active = true;
+    const requestId = ++vehicleChecksRequestRef.current;
+    const load = async () => {
+      setLoading(true);
+      setCheckLoading(false);
+      setVehicleLoadError("");
+      setCheckLoadError("");
+      setError("");
+      let routesLoaded = false;
+      try {
+        const { data } = await getRoutes(user.id);
+        if (!active) return;
         const nextRoutes = data.routes || [];
         const activeRoute = nextRoutes.find((route) => ["planned", "in_progress"].includes(route.status)) || nextRoutes[0];
         const nextVehicles = data.vehicles || [];
+        routesLoaded = true;
+        setVehicles(nextVehicles);
         const nextVehicle = nextVehicles.find((vehicle) => vehicle.licensePlate === activeRoute?.vehicleLicensePlate) || nextVehicles[0];
         const nextVehicleId = nextVehicle?.id ? String(nextVehicle.id) : "";
-        const fallback = readSavedCheck(buildStorageKey(user.id, nextVehicleId));
-        const savedResponse = nextVehicleId ? await getVehicleChecks({ vehicleId: nextVehicleId, date: today }) : null;
-        const saved = savedResponse?.data?.checks?.[0] ? toCheckState(savedResponse.data.checks[0]) : fallback;
-        setVehicles(nextVehicles);
+        const fallback = readSavedCheck(buildStorageKey(user.id, nextVehicleId, today));
         setSelectedVehicleId(nextVehicleId);
-        setChecks(saved.checks);
-        setOdometer(saved.odometer);
-        setOdometerPhoto(saved.odometerPhoto);
+        setChecks(fallback.checks);
+        setOdometer(fallback.odometer);
+        setOdometerPhoto(fallback.odometerPhoto);
         setPhotoPreviewError(false);
-        setObservations(saved.observations);
-        setSavedAt(saved.savedAt);
-      })
-      .catch(() => setError("No se pudieron cargar los vehículos o checks guardados."))
-      .finally(() => setLoading(false));
-  }, [user.id]);
+        setObservations(fallback.observations);
+        setSavedAt("");
+        setLocalCopy(fallback.source ? fallback : null);
+        if (!nextVehicleId) return;
+
+        setCheckLoading(true);
+        try {
+          const savedResponse = await getVehicleChecks({ vehicleId: nextVehicleId, date: today });
+          if (!active || requestId !== vehicleChecksRequestRef.current) return;
+          const savedCheck = savedResponse.data.checks?.[0];
+          if (savedCheck) {
+            const remote = toCheckState(savedCheck);
+            setChecks(remote.checks);
+            setOdometer(remote.odometer);
+            setOdometerPhoto(remote.odometerPhoto);
+            setObservations(remote.observations);
+            setSavedAt(remote.savedAt);
+            setLocalCopy(null);
+            localStorage.setItem(buildStorageKey(user.id, nextVehicleId, today), JSON.stringify({ ...remote, source: "server" }));
+          } else {
+            setLocalCopy(fallback.source ? fallback : null);
+          }
+        } catch {
+          if (active && requestId === vehicleChecksRequestRef.current) {
+            setCheckLoadError("No se pudo cargar el check guardado en el servidor.");
+          }
+        } finally {
+          if (active && requestId === vehicleChecksRequestRef.current) setCheckLoading(false);
+        }
+      } catch {
+        if (active) {
+          if (!routesLoaded) setVehicleLoadError("No se pudieron cargar tus vehículos.");
+          else setCheckLoadError("No se pudo cargar el check guardado en el servidor.");
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    load();
+    return () => {
+      active = false;
+      vehicleChecksRequestRef.current += 1;
+    };
+  }, [user.id, loadAttempt, today]);
 
   const selectedVehicle = vehicles.find((vehicle) => String(vehicle.id) === selectedVehicleId) || vehicles[0];
-  const storageKey = buildStorageKey(user.id, selectedVehicle?.id || selectedVehicleId);
+  const storageKey = buildStorageKey(user.id, selectedVehicle?.id || selectedVehicleId, today);
 
   const handleVehicleChange = (vehicleId) => {
-    const saved = readSavedCheck(buildStorageKey(user.id, vehicleId));
+    // Invalida respuestas pendientes de vehículos seleccionados anteriormente.
+    const requestId = ++vehicleChecksRequestRef.current;
+    const saved = readSavedCheck(buildStorageKey(user.id, vehicleId, today));
     setSelectedVehicleId(vehicleId);
     setChecks(saved.checks);
     setOdometer(saved.odometer);
     setOdometerPhoto(saved.odometerPhoto);
     setPhotoPreviewError(false);
     setObservations(saved.observations);
-    setSavedAt(saved.savedAt);
-    if (vehicleId) {
-      getVehicleChecks({ vehicleId, date: today })
-        .then(({ data }) => {
-          if (!data.checks?.[0]) return;
-          const remote = toCheckState(data.checks[0]);
-          setChecks(remote.checks);
-          setOdometer(remote.odometer);
-          setOdometerPhoto(remote.odometerPhoto);
-          setPhotoPreviewError(false);
-          setObservations(remote.observations);
-          setSavedAt(remote.savedAt);
-        })
-        .catch(() => undefined);
+    setSavedAt("");
+    setLocalCopy(saved.source ? saved : null);
+    setCheckLoadError("");
+    if (!vehicleId) return;
+    setCheckLoading(true);
+    getVehicleChecks({ vehicleId, date: today })
+      .then(({ data }) => {
+        if (requestId !== vehicleChecksRequestRef.current) return;
+        const savedCheck = data.checks?.[0];
+        if (!savedCheck) return;
+        const remote = toCheckState(savedCheck);
+        setChecks(remote.checks);
+        setOdometer(remote.odometer);
+        setOdometerPhoto(remote.odometerPhoto);
+        setPhotoPreviewError(false);
+        setObservations(remote.observations);
+        setSavedAt(remote.savedAt);
+        setLocalCopy(null);
+        localStorage.setItem(buildStorageKey(user.id, vehicleId, today), JSON.stringify({ ...remote, source: "server" }));
+      })
+      .catch(() => {
+        if (requestId === vehicleChecksRequestRef.current) setCheckLoadError("No se pudo cargar el check guardado en el servidor.");
+      })
+      .finally(() => {
+        if (requestId === vehicleChecksRequestRef.current) setCheckLoading(false);
+      });
+  };
+
+  const retrySelectedCheck = () => {
+    if (!selectedVehicleId) {
+      setLoadAttempt((attempt) => attempt + 1);
+      return;
     }
+    const requestId = ++vehicleChecksRequestRef.current;
+    setCheckLoadError("");
+    setCheckLoading(true);
+    getVehicleChecks({ vehicleId: selectedVehicleId, date: today })
+      .then(({ data }) => {
+        if (requestId !== vehicleChecksRequestRef.current) return;
+        const savedCheck = data.checks?.[0];
+        if (!savedCheck) return;
+        const remote = toCheckState(savedCheck);
+        setChecks(remote.checks);
+        setOdometer(remote.odometer);
+        setOdometerPhoto(remote.odometerPhoto);
+        setObservations(remote.observations);
+        setSavedAt(remote.savedAt);
+        setLocalCopy(null);
+      })
+      .catch(() => {
+        if (requestId === vehicleChecksRequestRef.current) setCheckLoadError("No se pudo cargar el check guardado en el servidor.");
+      })
+      .finally(() => {
+        if (requestId === vehicleChecksRequestRef.current) setCheckLoading(false);
+      });
   };
 
   const handleOdometerPhoto = (event) => {
@@ -252,8 +348,10 @@ export default function CheckVehiculo() {
       return;
     }
     const nextSavedAt = new Date().toISOString();
-    const draft = { checks, odometer, odometerPhoto, observations, savedAt: nextSavedAt };
+    const draft = { checks, odometer, odometerPhoto, observations, savedAt: nextSavedAt, source: "draft" };
     localStorage.setItem(storageKey, JSON.stringify(draft));
+    setSavedAt("");
+    setLocalCopy(draft);
     setSaving(true);
     setError("");
     try {
@@ -265,10 +363,14 @@ export default function CheckVehiculo() {
       setPhotoPreviewError(false);
       setObservations(remote.observations);
       setSavedAt(remote.savedAt);
-      localStorage.setItem(storageKey, JSON.stringify({ ...draft, odometerPhoto: remote.odometerPhoto, savedAt: remote.savedAt }));
+      setLocalCopy(null);
+      setCheckLoadError("");
+      localStorage.setItem(storageKey, JSON.stringify({ ...remote, source: "server" }));
     } catch (requestError) {
-      setSavedAt(nextSavedAt);
-      setError(requestError.response?.data?.message || "Check guardado localmente. Se sincronizará cuando exista conexión.");
+      const status = requestError.response?.status;
+      setError(status === 403
+        ? "El servidor rechazó este vehículo. El borrador permanece solo en este dispositivo."
+        : requestError.response?.data?.message || "No se pudo confirmar el guardado en el servidor. El borrador permanece solo en este dispositivo.");
     } finally {
       setSaving(false);
     }
@@ -294,12 +396,26 @@ export default function CheckVehiculo() {
         <article><small>Pendientes</small><strong>{loading ? "-" : metrics.pending}</strong></article>
       </div>
 
-      <form className="vehicle-check-form" onSubmit={handleSubmit}>
+      {loading ? <p className="route-success" role="status">Cargando vehículos...</p> : vehicleLoadError ? (
+        <div className="vehicle-check-route" role="alert">
+          <p>{vehicleLoadError}</p>
+          <button className="secondary-action" onClick={() => setLoadAttempt((attempt) => attempt + 1)} type="button">Volver a intentar</button>
+        </div>
+      ) : vehicles.length === 0 ? (
+        <div className="vehicle-check-route" role="status">
+          No tienes un vehículo asignado. Contacta a administración para continuar.
+        </div>
+      ) : <form className="vehicle-check-form" onSubmit={handleSubmit}>
         <section className="vehicle-check-route">
           <div className="panel-heading">
             <div><p className="eyebrow">Vehículo a revisar</p><h3>{selectedVehicle?.name || "Selecciona un vehículo"}</h3></div>
             <span>{selectedVehicle?.licensePlate || "-"}</span>
           </div>
+          {checkLoadError && <div className="vehicle-check-route" role="alert">
+            <p>{checkLoadError}</p>
+            <button className="secondary-action" onClick={retrySelectedCheck} type="button">Volver a cargar el check</button>
+          </div>}
+          {checkLoading && <p className="route-success" role="status">Cargando el check del servidor...</p>}
           <div className="vehicle-check-fields">
             <label>Camión / patente<select value={selectedVehicleId} onChange={(event) => handleVehicleChange(event.target.value)}>{vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.licensePlate} · {vehicle.name}</option>)}</select></label>
             <label>Odómetro<input min="0" step="1" type="number" value={odometer} onChange={(event) => setOdometer(event.target.value)} placeholder="Kilometraje inicial" /></label>
@@ -360,13 +476,16 @@ export default function CheckVehiculo() {
 
         <label className="vehicle-check-notes">Observaciones generales<textarea value={observations} onChange={(event) => setObservations(event.target.value)} placeholder="Registra anomalías, faltantes o autorización recibida" /></label>
 
-        {savedAt && <p className="route-success" role="status">Check guardado: {new Date(savedAt).toLocaleString("es-CL")}</p>}
+        {savedAt && <p className="route-success" role="status">Check confirmado en el servidor: {new Date(savedAt).toLocaleString("es-CL")}</p>}
+        {localCopy?.source === "draft" && <p className="route-error" role="status">Borrador solo en este dispositivo; todavía no está guardado en el servidor.</p>}
+        {localCopy?.source === "server" && <p className="route-error" role="status">Copia local de un check confirmado anteriormente; no se ha verificado con el servidor en esta sesión.</p>}
+        {localCopy?.source === "unknown" && <p className="route-error" role="status">Hay un estado local anterior cuya persistencia no se puede confirmar. Consulta al servidor antes de asumir que el check está guardado.</p>}
 
         <div className="route-detail-actions">
           <button className="primary-action" disabled={saving} type="submit">{saving ? "Guardando..." : "Guardar check"}</button>
           <button className="secondary-action" onClick={() => { setChecks(initialChecks); setOdometer(""); setOdometerPhoto(""); setPhotoPreviewError(false); setObservations(""); setSavedAt(""); localStorage.removeItem(storageKey); }} type="button">Limpiar</button>
         </div>
-      </form>
+      </form>}
     </section>
   );
 }

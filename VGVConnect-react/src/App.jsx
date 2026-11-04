@@ -1,4 +1,5 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import Layout from "./components/layout/Layout";
 import LoginPage from "./pages/Login/LoginPage";
 import Home from "./pages/Home/Home";
@@ -10,11 +11,34 @@ import DashboardChofer from "./pages/Drivers/DashboardChofer";
 import CheckVehiculo from "./pages/Drivers/CheckVehiculo";
 import RegistrarEntrega from "./pages/Drivers/entregas/RegistrarEntrega";
 import DriversOverview from "./pages/Drivers/DriversOverview";
+import ChangePasswordPage from "./pages/Account/ChangePasswordPage";
 import useAuth from "./hooks/useAuth";
+
+const CHANGE_PASSWORD_PATH = "/cambiar-contrasena";
+
+function RedirectToLogin() {
+  const navigate = useNavigate();
+  const redirectedRef = useRef(false);
+
+  useEffect(() => {
+    // StrictMode repite los efectos en desarrollo; la referencia garantiza una sola redirección.
+    if (redirectedRef.current) return;
+    redirectedRef.current = true;
+    navigate("/", { replace: true });
+  }, [navigate]);
+
+  return null;
+}
 
 function RoleRoute({ roles, children }) {
   const { user } = useAuth();
-  return user && roles.includes(user.role) ? children : <Navigate to="/" replace />;
+  if (user?.mustChangePassword) return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
+  return user && roles.includes(user.role) ? children : <RedirectToLogin />;
+}
+
+function AuthenticatedRoute({ children }) {
+  const { user } = useAuth();
+  return user ? children : <RedirectToLogin />;
 }
 
 const roleHome = {
@@ -26,6 +50,7 @@ const roleHome = {
 
 function RoleHome() {
   const { user } = useAuth();
+  if (user?.mustChangePassword) return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
   return <Navigate to={roleHome[user?.role] || "/"} replace />;
 }
 
@@ -35,6 +60,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LoginPage />} />
         <Route element={<Layout />}>
+          <Route path={CHANGE_PASSWORD_PATH} element={<AuthenticatedRoute><ChangePasswordPage roleHome={roleHome} /></AuthenticatedRoute>} />
           <Route path="/home" element={<RoleRoute roles={["admin", "route_planner", "billing"]}><Home /></RoleRoute>} />
           <Route path="/inicio" element={<Navigate to="/home" replace />} />
           <Route path="/dashboard" element={<RoleRoute roles={["admin", "route_planner", "billing"]}><Dashboard /></RoleRoute>} />

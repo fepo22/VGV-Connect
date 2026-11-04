@@ -5,7 +5,7 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const titles = { "/dashboard": ["Dashboard operativo", "Controla el estado de la operación en tiempo real"], "/entregas": ["Entregas", "Supervisa el estado de cada pedido"], "/rutas": ["Planificador de rutas", "Organiza recorridos y paradas"], "/rutas/entregas": ["Rutas de entrega", "Programa despachos a clientes"], "/rutas/retiros": ["Rutas de retiro", "Programa retiros de mercadería y compras"], "/choferes": ["Panel de conductores", "Supervisa disponibilidad, rutas y rendimiento"], "/conductor": ["Panel de conductor", "Revisa tus rutas asignadas y registra entregas"], "/conductor/check-vehiculo": ["Check vehículo", "Control preoperacional antes de iniciar ruta"], "/chofer": ["Panel de conductor", "Revisa tus rutas asignadas y registra entregas"], "/reportes": ["Reportes", "Analiza el rendimiento y detecta desvíos"] };
+  const titles = { "/dashboard": ["Dashboard operativo", "Controla el estado de la operación en tiempo real"], "/entregas": ["Entregas", "Supervisa el estado de cada pedido"], "/rutas": ["Planificador de rutas", "Organiza recorridos y paradas"], "/rutas/entregas": ["Rutas de entrega", "Programa despachos a clientes"], "/rutas/retiros": ["Rutas de retiro", "Programa retiros de mercadería y compras"], "/choferes": ["Panel de conductores", "Supervisa disponibilidad, rutas y rendimiento"], "/conductor": ["Panel de conductor", "Revisa tus rutas asignadas y registra entregas"], "/conductor/check-vehiculo": ["Check vehículo", "Control preoperacional antes de iniciar ruta"], "/chofer": ["Panel de conductor", "Revisa tus rutas asignadas y registra entregas"], "/reportes": ["Reportes", "Analiza el rendimiento y detecta desvíos"], "/cambiar-contrasena": ["Mi cuenta", "Actualiza tu contraseña de acceso"] };
   const [title, subtitle] = titles[location.pathname] || titles["/dashboard"];
 
   const handleLogout = () => {
@@ -31,6 +31,11 @@ export default function Navbar() {
             <small>{user?.role || "Sesión activa"}</small>
           </span>
         </div>
+        {user && (
+          <button type="button" className="logout-button" onClick={() => navigate("/cambiar-contrasena")}>
+            Cambiar contraseña
+          </button>
+        )}
         {user && (
           <button type="button" className="logout-button" onClick={handleLogout}>
             Cerrar sesión

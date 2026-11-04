@@ -10,7 +10,7 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "node prisma/seed.js",
-    "test": "node controllers/routes.controller.test.js"
+    "test": "node services/operational-date.service.test.js && node controllers/routes.controller.test.js && node --experimental-vm-modules security.test.js && node --experimental-vm-modules routes.access.test.js && node --experimental-vm-modules auth.hardening.test.js && node --experimental-vm-modules --no-deprecation password.lifecycle.test.js && node --experimental-vm-modules --no-deprecation assignments.consistency.test.js"
   },
   "engines": {
     "node": ">=20"

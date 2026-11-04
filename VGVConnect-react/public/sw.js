@@ -1,5 +1,6 @@
-const CACHE_NAME = "vgv-connect-pwa-v1";
+const CACHE_NAME = "vgv-connect-pwa-v2";
 const APP_SHELL = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon.svg", "/offline.html"];
+const API_PATHS = new Set(["api-docs", "audit", "auth", "deliveries", "drivers", "health", "openapi.json", "routes", "vehicle-checks"]);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -18,6 +19,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
 
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  if (API_PATHS.has(url.pathname.split("/")[1])) return;
 
   if (request.mode === "navigate") {
     event.respondWith(
