@@ -92,7 +92,7 @@ No se incluyen archivos `.env`, secretos, logs, bases ni exportaciones de datos.
 No se modificaron autenticacion, modelos, migraciones, `optimizeRoute` ni el
 criterio de ordenamiento de las entregas.
 
-## Push pendiente: divergencia del remoto
+## Divergencia del remoto y resolucion posterior
 
 - Remoto configurado: `https://github.com/fepo22/VGV-Connect.git`.
 - Seguimiento de `main`: `origin/main`.
@@ -112,12 +112,33 @@ criterio de ordenamiento de las entregas.
   modifico produccion para comprobarlo.
 - El stash existente se conserva sin aplicar, modificar ni eliminar.
 
+### Integracion autorizada despues del respaldo local
+
+- Respaldo local creado: `1ef2c9cf3b87e02d344febcbac2f0559a9b26d0d`.
+- El usuario autorizo integrar mejoras compatibles del remoto conservando el
+  nucleo PostgreSQL actual y sin activar los modulos mock antiguos.
+- Se resolvieron 23 conflictos archivo por archivo. Se mantienen los contratos
+  actuales de las APIs, autenticacion, modelo y migraciones, controles de
+  acceso, reportes, rutas y entregas, asi como las cuatro correcciones validadas.
+- Los pedidos/clientes basados en mocks, sus pantallas dependientes y el modelo
+  alternativo no se activan ni se copian al arbol final. Sus versiones originales
+  siguen disponibles en los commits remotos incorporados como ancestros.
+- Se incorpora el componente reutilizable de notificaciones del remoto
+  (`ToastContext.jsx` y `toast-context.js`) y su proveedor en el layout actual.
+  La confirmacion de Routeplanner conserva su mensaje existente, sin duplicados.
+- No se incorpora Leaflet ni se cambian dependencias o el proveedor de mapas:
+  esa alternativa requiere una decision funcional separada.
+- El usuario confirmo que los despliegues automaticos estan desactivados y
+  autorizo el push normal a `origin/main` tras validar la fusion. No se modifico
+  ninguna configuracion de despliegue ni se accedio a produccion.
+- El estado final del push debe verificarse comparando `HEAD` con la referencia
+  `refs/heads/main` del remoto. No se autoriza force push.
+
 ## Pendiente y proximos pasos
 
-1. Revisar la divergencia entre los historiales local y remoto y acordar un
-   procedimiento de respaldo remoto que no pierda trabajo ni incorpore cambios
-   ajenos sin revision. No usar force push.
-2. Confirmar que el futuro respaldo remoto no activara despliegues.
+1. Verificar que la fusion validada quede respaldada en `origin/main` mediante
+   push normal, sin force push. Los dos historiales deben ser ancestros del merge.
+2. Mantener los despliegues automaticos desactivados para este respaldo.
 3. Diagnosticar por que cambia el orden de las entregas/paradas despues de
    guardar una ruta. Identificar con el usuario el criterio de orden esperado
    antes de modificar codigo. No corregirlo todavia.

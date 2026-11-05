@@ -1,6 +1,7 @@
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 import { Outlet } from "react-router-dom";
+import { ToastProvider } from "../ui/ToastContext";
 
 export default function Layout() {
   return (
@@ -8,7 +9,9 @@ export default function Layout() {
       <Sidebar />
       <div className="app-main">
         <Navbar />
-        <main className="page-content"><Outlet /></main>
+        <ToastProvider>
+          <main className="page-content"><Outlet /></main>
+        </ToastProvider>
       </div>
     </div>
   );
