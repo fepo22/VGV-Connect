@@ -101,6 +101,7 @@ export default function Routeplanner({ routeType = "delivery" }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [routeSearch, setRouteSearch] = useState("");
   const [routeFromDate, setRouteFromDate] = useState("");
   const [routeToDate, setRouteToDate] = useState("");
@@ -184,6 +185,7 @@ export default function Routeplanner({ routeType = "delivery" }) {
   );
 
   const selectRoute = (route) => {
+    setSuccess("");
     selectedRouteRef.current = route;
     editingIdRef.current = route.id;
     setSelectedRoute(route);
@@ -275,15 +277,25 @@ export default function Routeplanner({ routeType = "delivery" }) {
     }
     setSaving(true);
     setError("");
+    setSuccess("");
     try {
       const nextPayload = buildRoutePayload();
       if (editingId) await updateRoute(editingId, nextPayload);
       else await createRoute(nextPayload);
+      const driverChanged = editingId
+        && String(selectedRoute?.driverId || "") !== String(nextPayload.driverId || "");
+      const newDriver = drivers.find((driver) => String(driver.id) === String(nextPayload.driverId));
+      setSuccess(editingId
+        ? driverChanged
+          ? `Ruta actualizada correctamente. Nuevo conductor: ${newDriver?.name || newDriver?.username || "conductor seleccionado"}.`
+          : "Ruta actualizada correctamente."
+        : "Ruta creada correctamente.");
       setForm(initialForm);
       editingIdRef.current = null;
       setEditingId(null);
       await loadRoutes();
     } catch (requestError) {
+      setSuccess("");
       setError(requestError.response?.data?.message || (editingId ? "No se pudieron guardar los cambios de la ruta." : "No se pudo crear la ruta."));
     } finally {
       setSaving(false);
@@ -351,6 +363,7 @@ export default function Routeplanner({ routeType = "delivery" }) {
       </div>
 
       {error && <p className="route-error" role="alert">{error}</p>}
+      {success && <p className="route-success" role="status">{success}</p>}
 
       {routeType === "all" && (
         <div className="route-quick-summary" aria-label="Resumen rápido de submenús de rutas">

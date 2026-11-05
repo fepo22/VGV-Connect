@@ -469,6 +469,43 @@ assert.equal(editPlanned.statusCode, 200);
 assert.ok(db.deliveries.filter((delivery) => delivery.routeId === 1).every((delivery) => delivery.status !== "pending"));
 console.log("PASS draft-to-planned updates stop statuses and allows a subsequent edit without stale pending states");
 
+const originalTimeZone = process.env.TZ;
+for (const timeZone of ["America/Santiago", "UTC", "Asia/Tokyo", "America/New_York"]) {
+  process.env.TZ = timeZone;
+  for (const [date, startTime] of [["2027-01-15", "08:00"], ["2026-07-01", "11:00"], ["2027-01-15", "00:00"], ["2027-01-15", "00:30"], ["2026-12-31", "23:30"], ["2027-04-04", "23:59"], ["2026-09-06", "21:00"]]) {
+    reset();
+    const created = await invoke(routeController.createRoute, request("route_planner", 2, { date, startTime, destination: "Destino horario", driverId: 7, vehicleId: 13, stops: [] }));
+    assert.equal(created.statusCode, 201);
+    assert.equal(created.body.startTime, startTime, `${timeZone} ${date} ${startTime}: respuesta de creación`);
+    const routeId = String(created.body.id);
+    for (let save = 1; save <= 3; save += 1) {
+      const read = await invoke(routeController.getRoute, request("route_planner", 2, {}, { id: routeId }));
+      assert.equal(read.body.startTime, startTime, `${timeZone} ${date} ${startTime}: lectura antes del guardado ${save}`);
+      assert.equal(read.body.date, date);
+      // El planificador reenvía el formulario completo con la hora leída.
+      const saved = await invoke(routeController.updateRoute, request("route_planner", 2, {
+        date: read.body.date, startTime: read.body.startTime, origin: read.body.origin, destination: read.body.destination,
+        driverId: String(read.body.driverId), vehicleId: String(read.body.vehicleId), stops: read.body.stops,
+      }, { id: routeId }));
+      assert.equal(saved.statusCode, 200);
+      assert.equal(saved.body.startTime, startTime, `${timeZone} ${date} ${startTime}: guardado ${save}`);
+    }
+    const finalRead = await invoke(routeController.getRoute, request("route_planner", 2, {}, { id: routeId }));
+    assert.equal(finalRead.body.startTime, startTime);
+    assert.equal(finalRead.body.date, date);
+  }
+}
+if (originalTimeZone === undefined) delete process.env.TZ;
+else process.env.TZ = originalTimeZone;
+reset();
+const beforeInvalidTime = clone(db);
+const invalidCreateTime = await invoke(routeController.createRoute, request("route_planner", 2, { date: "2027-01-15", startTime: "25:00", destination: "Destino", driverId: 7, vehicleId: 13 }));
+const invalidUpdateTime = await invoke(routeController.updateRoute, request("route_planner", 2, { startTime: "8:00" }, { id: "1" }));
+assert.equal(invalidCreateTime.statusCode, 400);
+assert.equal(invalidUpdateTime.statusCode, 400);
+assert.deepEqual(db, beforeInvalidTime);
+console.log("PASS route start time survives create/read/save cycles unchanged in any server time zone and rejects invalid times");
+
 reset();
 db.failTransactionConflict = true;
 const updateConflict = await invoke(routeController.updateRoute, request("admin", 1, { driverId: 8 }, { id: "1" }));

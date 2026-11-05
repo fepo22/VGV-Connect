@@ -8,6 +8,7 @@ import auditRoutes from "../routes/audit.routes.js";
 import driversRoutes from "../routes/drivers.routes.js";
 import vehicleChecksRoutes from "../routes/vehicle-checks.routes.js";
 import openApiDocument from "../docs/openapi.js";
+import { errorHandler } from "../middleware/error-handler.middleware.js";
 
 const app = express();
 const defaultOrigins = ["http://localhost:5173", "http://127.0.0.1:5173"];
@@ -35,5 +36,7 @@ app.use("/auth", authRoutes);
 app.use("/audit", auditRoutes);
 app.use("/drivers", driversRoutes);
 app.use("/vehicle-checks", vehicleChecksRoutes);
+
+app.use(errorHandler);
 
 export default app;

@@ -1,13 +1,12 @@
 import prisma from "../prismaClient.js";
 import { logAudit } from "../services/audit.service.js";
 import { geocodeAddress } from "../services/geocoding.service.js";
-import { getOperationalDate, parseDateOnly } from "../services/operational-date.service.js";
+import { formatOperationalTime, getOperationalDate, parseDateOnly, parseOperationalStartAt } from "../services/operational-date.service.js";
 import { canTransitionDelivery, canTransitionRoute } from "../services/status-transitions.service.js";
 
 const drivers = async () => prisma.user.findMany({ where: { role: "driver" }, select: { id: true, name: true, username: true, defaultVehicleId: true }, orderBy: { name: "asc" } });
 const routeInclude = { driver: { select: { id: true, name: true } }, vehicle: true, deliveries: true };
-const toRoute = (route) => ({ ...route, date: route.serviceDate.toISOString().slice(0, 10), deliveryDate: route.deliveryDate?.toISOString().slice(0, 10) || "", startTime: route.startAt.toISOString().slice(11, 16), weightKg: route.weightKg === null ? null : Number(route.weightKg), volumeM3: route.volumeM3 === null ? null : Number(route.volumeM3), driverName: route.driver?.name || "Sin asignar", vehicleName: route.vehicle?.name || "Sin camión", vehicleLicensePlate: route.vehicle?.licensePlate || "Patente pendiente", stopCount: route.deliveries.length, stops: route.deliveries.map((delivery, index) => ({ id: delivery.id, guideNumber: delivery.guideNumber, client: delivery.clientName, address: delivery.address, status: delivery.status, sequence: index + 1, location: delivery.latitude !== null && delivery.longitude !== null ? { lat: Number(delivery.latitude), lng: Number(delivery.longitude) } : null })), coordinates: route.deliveries.filter((delivery) => delivery.latitude !== null && delivery.longitude !== null).map((delivery) => ({ lat: Number(delivery.latitude), lng: Number(delivery.longitude) })) });
-const startAt = (date, time) => new Date(`${date}T${time}:00`);
+const toRoute = (route) => ({ ...route, date: route.serviceDate.toISOString().slice(0, 10), deliveryDate: route.deliveryDate?.toISOString().slice(0, 10) || "", startTime: formatOperationalTime(route.startAt), weightKg: route.weightKg === null ? null : Number(route.weightKg), volumeM3: route.volumeM3 === null ? null : Number(route.volumeM3), driverName: route.driver?.name || "Sin asignar", vehicleName: route.vehicle?.name || "Sin camión", vehicleLicensePlate: route.vehicle?.licensePlate || "Patente pendiente", stopCount: route.deliveries.length, stops: route.deliveries.map((delivery, index) => ({ id: delivery.id, guideNumber: delivery.guideNumber, client: delivery.clientName, address: delivery.address, status: delivery.status, sequence: index + 1, location: delivery.latitude !== null && delivery.longitude !== null ? { lat: Number(delivery.latitude), lng: Number(delivery.longitude) } : null })), coordinates: route.deliveries.filter((delivery) => delivery.latitude !== null && delivery.longitude !== null).map((delivery) => ({ lat: Number(delivery.latitude), lng: Number(delivery.longitude) })) });
 const nextRouteName = async (date, client = prisma) => {
   const dayStart = parseDateOnly(date);
   const dayEnd = new Date(dayStart);
@@ -104,6 +103,8 @@ export const createRoute = async (req, res) => {
   const documentType = normalizeRouteType(req.body.documentType);
   if (!date || !startTime || !destination || driverId == null || vehicleId == null) return res.status(400).json({ message: "Chofer, patente, fecha, hora y destino son obligatorios" });
   if (!parseDateOnly(date) || (deliveryDate && !parseDateOnly(deliveryDate))) return res.status(400).json({ message: "La fecha de ruta no es válida" });
+  const routeStartAt = parseOperationalStartAt(date, startTime);
+  if (!routeStartAt) return res.status(400).json({ message: "La hora de inicio no es válida" });
   if (stops !== undefined && !Array.isArray(stops)) return res.status(400).json({ message: "Las paradas deben enviarse como una lista" });
   if ((stops || []).some((stop) => !stop || typeof stop !== "object" || Array.isArray(stop))) return res.status(400).json({ message: "Una o más paradas no son válidas" });
   const normalizedStops = (stops || []).map((stop) => normalizeRouteStopInput(stop, "pending"));
@@ -125,7 +126,7 @@ export const createRoute = async (req, res) => {
       data: {
         serviceDate: parseDateOnly(date),
         deliveryDate: deliveryDate ? parseDateOnly(deliveryDate) : null,
-        startAt: startAt(date, startTime),
+        startAt: routeStartAt,
         origin: origin || "",
         destination,
         weightKg: weightKg ?? null,
@@ -173,6 +174,7 @@ export const updateRoute = async (req, res) => {
   if (driverChanged && body.driverId !== null && nextDriverId === null) return res.status(400).json({ message: "Conductor no válido" });
   if (vehicleChanged && body.vehicleId !== null && nextVehicleId === null) return res.status(400).json({ message: "Vehículo no válido" });
   if ((date !== undefined && !parseDateOnly(date)) || (deliveryDate && !parseDateOnly(deliveryDate))) return res.status(400).json({ message: "La fecha de ruta no es válida" });
+  if (startTime && !parseOperationalStartAt(date || "2000-01-01", startTime)) return res.status(400).json({ message: "La hora de inicio no es válida" });
   if (stops !== undefined && !Array.isArray(stops)) return res.status(400).json({ message: "Las paradas deben enviarse como una lista" });
   if ((stops || []).some((stop) => !stop || typeof stop !== "object" || Array.isArray(stop))) return res.status(400).json({ message: "Una o más paradas no son válidas" });
   if ((stops || []).some((stop) => stop.id != null && stop.id !== "" && !positiveId(stop.id))) return res.status(400).json({ message: "Una o más paradas contienen identificadores no válidos" });
@@ -279,7 +281,7 @@ export const updateRoute = async (req, res) => {
       data: {
         serviceDate: date ? parseDateOnly(date) : undefined,
         deliveryDate: deliveryDate === undefined ? undefined : deliveryDate ? parseDateOnly(deliveryDate) : null,
-        startAt: startTime ? startAt(date || route.serviceDate.toISOString().slice(0, 10), startTime) : undefined,
+        startAt: startTime ? parseOperationalStartAt(date || route.serviceDate.toISOString().slice(0, 10), startTime) : undefined,
         origin,
         destination,
         weightKg,

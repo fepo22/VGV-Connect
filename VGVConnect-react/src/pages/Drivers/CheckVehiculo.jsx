@@ -90,6 +90,8 @@ const toCheckState = (check) => ({
   savedAt: check?.updatedAt || check?.createdAt || "",
 });
 
+const checkLoadErrorMessage = "No fue posible verificar si ya existe un check guardado para hoy. El guardado está bloqueado hasta que vuelvas a cargar el check.";
+
 const isRenderableImage = (value) => value?.startsWith("data:image/") || value?.startsWith("blob:") || value?.startsWith("http");
 
 export default function CheckVehiculo() {
@@ -109,6 +111,8 @@ export default function CheckVehiculo() {
   const [error, setError] = useState("");
   const [vehicleLoadError, setVehicleLoadError] = useState("");
   const [checkLoadError, setCheckLoadError] = useState("");
+  // Solo "loaded" confirma que se consultó el check existente del servidor y habilita el guardado.
+  const [checkLoadStatus, setCheckLoadStatus] = useState("pending");
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [photoPreviewError, setPhotoPreviewError] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -136,6 +140,7 @@ export default function CheckVehiculo() {
       setCheckLoading(false);
       setVehicleLoadError("");
       setCheckLoadError("");
+      setCheckLoadStatus("pending");
       setError("");
       let routesLoaded = false;
       try {
@@ -176,9 +181,11 @@ export default function CheckVehiculo() {
           } else {
             setLocalCopy(fallback.source ? fallback : null);
           }
+          setCheckLoadStatus("loaded");
         } catch {
           if (active && requestId === vehicleChecksRequestRef.current) {
-            setCheckLoadError("No se pudo cargar el check guardado en el servidor.");
+            setCheckLoadError(checkLoadErrorMessage);
+            setCheckLoadStatus("failed");
           }
         } finally {
           if (active && requestId === vehicleChecksRequestRef.current) setCheckLoading(false);
@@ -186,7 +193,10 @@ export default function CheckVehiculo() {
       } catch {
         if (active) {
           if (!routesLoaded) setVehicleLoadError("No se pudieron cargar tus vehículos.");
-          else setCheckLoadError("No se pudo cargar el check guardado en el servidor.");
+          else {
+            setCheckLoadError(checkLoadErrorMessage);
+            setCheckLoadStatus("failed");
+          }
         }
       } finally {
         if (active) setLoading(false);
@@ -215,11 +225,14 @@ export default function CheckVehiculo() {
     setSavedAt("");
     setLocalCopy(saved.source ? saved : null);
     setCheckLoadError("");
+    setCheckLoadStatus("pending");
+    setError("");
     if (!vehicleId) return;
     setCheckLoading(true);
     getVehicleChecks({ vehicleId, date: today })
       .then(({ data }) => {
         if (requestId !== vehicleChecksRequestRef.current) return;
+        setCheckLoadStatus("loaded");
         const savedCheck = data.checks?.[0];
         if (!savedCheck) return;
         const remote = toCheckState(savedCheck);
@@ -233,7 +246,9 @@ export default function CheckVehiculo() {
         localStorage.setItem(buildStorageKey(user.id, vehicleId, today), JSON.stringify({ ...remote, source: "server" }));
       })
       .catch(() => {
-        if (requestId === vehicleChecksRequestRef.current) setCheckLoadError("No se pudo cargar el check guardado en el servidor.");
+        if (requestId !== vehicleChecksRequestRef.current) return;
+        setCheckLoadError(checkLoadErrorMessage);
+        setCheckLoadStatus("failed");
       })
       .finally(() => {
         if (requestId === vehicleChecksRequestRef.current) setCheckLoading(false);
@@ -247,10 +262,13 @@ export default function CheckVehiculo() {
     }
     const requestId = ++vehicleChecksRequestRef.current;
     setCheckLoadError("");
+    setCheckLoadStatus("pending");
+    setError("");
     setCheckLoading(true);
     getVehicleChecks({ vehicleId: selectedVehicleId, date: today })
       .then(({ data }) => {
         if (requestId !== vehicleChecksRequestRef.current) return;
+        setCheckLoadStatus("loaded");
         const savedCheck = data.checks?.[0];
         if (!savedCheck) return;
         const remote = toCheckState(savedCheck);
@@ -262,7 +280,9 @@ export default function CheckVehiculo() {
         setLocalCopy(null);
       })
       .catch(() => {
-        if (requestId === vehicleChecksRequestRef.current) setCheckLoadError("No se pudo cargar el check guardado en el servidor.");
+        if (requestId !== vehicleChecksRequestRef.current) return;
+        setCheckLoadError(checkLoadErrorMessage);
+        setCheckLoadStatus("failed");
       })
       .finally(() => {
         if (requestId === vehicleChecksRequestRef.current) setCheckLoading(false);
@@ -339,6 +359,12 @@ export default function CheckVehiculo() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (checkLoadStatus !== "loaded") {
+      setError(checkLoadStatus === "failed"
+        ? "No se puede guardar: primero vuelve a cargar el check guardado en el servidor."
+        : "Espera a que termine la verificación del check guardado antes de guardar.");
+      return;
+    }
     if (!odometerPhoto) {
       setError("Debes tomar o adjuntar una foto del tablero para respaldar el kilometraje.");
       return;
@@ -482,7 +508,7 @@ export default function CheckVehiculo() {
         {localCopy?.source === "unknown" && <p className="route-error" role="status">Hay un estado local anterior cuya persistencia no se puede confirmar. Consulta al servidor antes de asumir que el check está guardado.</p>}
 
         <div className="route-detail-actions">
-          <button className="primary-action" disabled={saving} type="submit">{saving ? "Guardando..." : "Guardar check"}</button>
+          <button className="primary-action" disabled={saving || checkLoadStatus !== "loaded"} type="submit">{saving ? "Guardando..." : "Guardar check"}</button>
           <button className="secondary-action" onClick={() => { setChecks(initialChecks); setOdometer(""); setOdometerPhoto(""); setPhotoPreviewError(false); setObservations(""); setSavedAt(""); localStorage.removeItem(storageKey); }} type="button">Limpiar</button>
         </div>
       </form>}
